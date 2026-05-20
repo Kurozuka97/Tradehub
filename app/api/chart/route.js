@@ -8,7 +8,7 @@ export async function GET(request) {
     return Response.json({ error: "invalid_coin" }, { status: 400 });
   }
 
-  const validDays = ["7","14","30","90"];
+  const validDays = ["1","7","14","30","90"];
   if (!validDays.includes(days)) {
     return Response.json({ error: "invalid_days" }, { status: 400 });
   }

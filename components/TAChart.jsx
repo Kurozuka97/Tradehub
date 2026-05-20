@@ -20,7 +20,7 @@ const COINS = [
   { id: "binancecoin", sym: "BNB" },
   { id: "ripple", sym: "XRP" },
 ];
-const DAYS = [7, 14, 30, 90];
+const DAYS = [1, 7, 14, 30, 90];
 
 function computeMA(arr, n) {
   return arr.map((v, i) => {

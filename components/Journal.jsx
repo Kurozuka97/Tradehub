@@ -5,43 +5,74 @@ import { Plus, Trash2, TrendingUp, TrendingDown, X } from "lucide-react";
 
 const STORAGE_KEY = "tradehub_journal";
 
-const INIT = [
-  { id: 1, date: "2025-05-10", pair: "BTC/USDT", type: "Long", entry: 61500, exit: 65000, size: 0.1, note: "" },
-  { id: 2, date: "2025-05-12", pair: "ETH/USDT", type: "Long", entry: 3200, exit: 3450, size: 0.5, note: "" },
-  { id: 3, date: "2025-05-15", pair: "SOL/USDT", type: "Short", entry: 175, exit: 160, size: 2, note: "Clean breakdown" },
-];
-
 function calcPnL(t) {
   return +((t.exit - t.entry) * t.size * (t.type === "Long" ? 1 : -1)).toFixed(2);
 }
 
-export default function Journal() {
+export default function BuySell() {
   const [trades, setTrades] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ date: "", pair: "", type: "Long", entry: "", exit: "", size: "", note: "" });
+  const [form, setForm] = useState({
+    date: "",
+    pair: "",
+    type: "Long",
+    entry: "",
+    exit: "",
+    size: "",
+    stopLoss: "",
+    takeProfit: "",
+    note: "",
+  });
 
+  // Load from localStorage on mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      setTrades(saved ? JSON.parse(saved) : INIT);
+      setTrades(saved ? JSON.parse(saved) : []);
     } catch {
-      setTrades(INIT);
+      setTrades([]);
     }
   }, []);
 
   const save = (updated) => {
     setTrades(updated);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } catch {}
   };
 
   const addTrade = () => {
+    // Basic required validation
     if (!form.date || !form.pair || !form.entry || !form.exit || !form.size) return;
-    save([...trades, { ...form, id: Date.now(), entry: +form.entry, exit: +form.exit, size: +form.size }]);
-    setForm({ date: "", pair: "", type: "Long", entry: "", exit: "", size: "", note: "" });
+    const newTrade = {
+      ...form,
+      id: Date.now(),
+      entry: +form.entry,
+      exit: +form.exit,
+      size: +form.size,
+      // Convert optional numeric fields if supplied
+      ...(form.stopLoss && { stopLoss: +form.stopLoss }),
+      ...(form.takeProfit && { takeProfit: +form.takeProfit }),
+    };
+    save([...trades, newTrade]);
+    setForm({
+      date: "",
+      pair: "",
+      type: "Long",
+      entry: "",
+      exit: "",
+      size: "",
+      stopLoss: "",
+      takeProfit: "",
+      note: "",
+    });
     setShowForm(false);
   };
 
-  const del = (id) => save(trades.filter((t) => t.id !== id));
+  const del = (id) => {
+    if (!window.confirm("Delete this trade?")) return;
+    save(trades.filter((t) => t.id !== id));
+  };
 
   const totalPnL = trades.reduce((s, t) => s + calcPnL(t), 0);
   const wins = trades.filter((t) => calcPnL(t) > 0).length;
@@ -50,6 +81,44 @@ export default function Journal() {
   const worst = trades.length ? Math.min(...trades.map(calcPnL)) : 0;
 
   const pnlColor = (v) => (v > 0 ? "text-brand-green" : v < 0 ? "text-brand-red" : "text-slate-500");
+
+  const exportCSV = () => {
+    const header = [
+      "Date",
+      "Pair",
+      "Type",
+      "Entry",
+      "Exit",
+      "Size",
+      "StopLoss",
+      "TakeProfit",
+      "PnL",
+      "Note",
+    ];
+    const rows = trades.map((t) => [
+      t.date,
+      t.pair,
+      t.type,
+      t.entry,
+      t.exit,
+      t.size,
+      t.stopLoss ?? "",
+      t.takeProfit ?? "",
+      calcPnL(t),
+      t.note?.replace(/"/g, '""') ?? "",
+    ]);
+    const csvContent = [header, ...rows]
+      .map((r) => r.map((v) => `"${v}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "tradehub_trades.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div>
@@ -67,6 +136,18 @@ export default function Journal() {
           </div>
         ))}
       </div>
+
+      {/* Export button */}
+      {trades.length > 0 && (
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={exportCSV}
+            className="px-3 py-1.5 rounded-lg text-xs bg-bg-card border border-bg-border text-slate-400 hover:text-white transition-colors"
+          >
+            Export CSV
+          </button>
+        </div>
+      )}
 
       {/* Add Trade */}
       <div className="flex justify-between items-center mb-4">
@@ -92,6 +173,8 @@ export default function Journal() {
               { label: "Entry ($)", type: "number", key: "entry", placeholder: "0" },
               { label: "Exit ($)", type: "number", key: "exit", placeholder: "0" },
               { label: "Size", type: "number", key: "size", placeholder: "0" },
+              { label: "Stop Loss ($)", type: "number", key: "stopLoss", placeholder: "optional" },
+              { label: "Take Profit ($)", type: "number", key: "takeProfit", placeholder: "optional" },
             ].map((f) => (
               <div key={f.key}>
                 <label className="block text-xs text-slate-500 mb-1.5">{f.label}</label>
@@ -134,6 +217,11 @@ export default function Journal() {
               Save Trade
             </button>
           </div>
+
+          {/* Disclaimer */}
+          <p className="mt-2 text-xs text-slate-500 italic">
+            ⚠️ AI analysis only – not a trade recommendation. Conduct your own research.
+          </p>
         </div>
       )}
 
@@ -170,6 +258,12 @@ export default function Journal() {
                     <p className="text-sm font-medium text-white">{t.pair}</p>
                     <p className="text-xs text-slate-500">
                       {t.date} · ${t.entry.toLocaleString()} → ${t.exit.toLocaleString()} · ×{t.size}
+                      {t.stopLoss !== undefined && t.stopLoss !== null && t.stopLoss !== "" && (
+                        <span className="text-slate-600"> · SL ${t.stopLoss}</span>
+                      )}
+                      {t.takeProfit !== undefined && t.takeProfit !== null && t.takeProfit !== "" && (
+                        <span className="text-slate-600"> · TP ${t.takeProfit}</span>
+                      )}
                       {t.note && <span className="text-slate-600"> · {t.note}</span>}
                     </p>
                   </div>

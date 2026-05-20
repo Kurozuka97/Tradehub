@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Dashboard from "@/components/Dashboard";
 import TAChart from "@/components/TAChart";
-import Journal from "@/components/Journal";
+import BuySell from "@/components/Journal";
 import Guide from "@/components/Guide";
 import {
   LayoutDashboard,
@@ -16,7 +16,7 @@ import {
 const TABS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "ta", label: "TA Chart", icon: LineChart },
-  { key: "journal", label: "Journal", icon: BookOpen },
+  { key: "buysell", label: "Buy/Sell", icon: BookOpen },
   { key: "guide", label: "Guide", icon: GraduationCap },
 ];
 
@@ -36,7 +36,7 @@ export default function Home() {
           </div>
           <div>
             <h1 className="text-base font-semibold text-white leading-none">TradeHub</h1>
-            <p className="text-xs text-slate-500 mt-0.5">Crypto · Forex · TA · Journal</p>
+            <p className="text-xs text-slate-500 mt-0.5">Crypto · Forex · TA · Buy/Sell</p>
           </div>
         </div>
         <button
@@ -70,7 +70,7 @@ export default function Home() {
       <main className="px-6 py-6 max-w-5xl mx-auto">
         {tab === "dashboard" && <Dashboard refreshKey={refreshKey} />}
         {tab === "ta" && <TAChart refreshKey={refreshKey} />}
-        {tab === "journal" && <Journal />}
+        {tab === "buysell" && <BuySell />}
         {tab === "guide" && <Guide />}
       </main>
     </div>

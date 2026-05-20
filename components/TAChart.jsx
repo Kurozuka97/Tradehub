@@ -30,6 +30,45 @@ function computeMA(arr, n) {
   });
 }
 
+// Bollinger Bands
+function computeBollinger(arr, n = 20, k = 2) {
+  const upper = new Array(arr.length).fill(null);
+  const lower = new Array(arr.length).fill(null);
+  for (let i = n - 1; i < arr.length; i++) {
+    const slice = arr.slice(i - n + 1, i + 1);
+    const avg = slice.reduce((a, b) => a + b, 0) / n;
+    const variance = slice.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / n;
+    const std = Math.sqrt(variance);
+    upper[i] = +(avg + k * std).toFixed(4);
+    lower[i] = +(avg - k * std).toFixed(4);
+  }
+  return { upper, lower };
+}
+
+// Exponential Moving Average
+function computeEMA(arr, n) {
+  const k = 2 / (n + 1);
+  const ema = [];
+  arr.forEach((price, i) => {
+    if (i === 0) {
+      ema[i] = price;
+    } else {
+      ema[i] = price * k + ema[i - 1] * (1 - k);
+    }
+  });
+  return ema;
+}
+
+// MACD
+function computeMACD(arr, fast = 12, slow = 26, signal = 9) {
+  const emaFast = computeEMA(arr, fast);
+  const emaSlow = computeEMA(arr, slow);
+  const macd = emaFast.map((v, i) => v - emaSlow[i]);
+  const signalLine = computeEMA(macd, signal);
+  const hist = macd.map((v, i) => v - signalLine[i]);
+  return { macd, signal: signalLine, hist };
+}
+
 function computeRSI(arr, n = 14) {
   const ch = arr.map((v, i) => (i === 0 ? 0 : v - arr[i - 1]));
   return arr.map((_, i) => {
@@ -79,6 +118,10 @@ export default function TAChart({ refreshKey }) {
       const m7 = computeMA(prices, 7);
       const m25 = computeMA(prices, 25);
       const rsis = computeRSI(prices, 14);
+      // New indicators
+      const bb = computeBollinger(prices);
+      const ema9 = computeEMA(prices, 9);
+      const macdData = computeMACD(prices);
 
       setChart(
         sampled.map(([ts], i) => ({
@@ -87,6 +130,11 @@ export default function TAChart({ refreshKey }) {
           ma7: m7[i],
           ma25: m25[i],
           rsi: rsis[i],
+          bbUpper: bb.upper[i],
+          bbLower: bb.lower[i],
+          ema9: ema9[i],
+          macd: macdData.macd[i],
+          macdSignal: macdData.signal[i],
         }))
       );
     } catch {
@@ -171,6 +219,11 @@ export default function TAChart({ refreshKey }) {
               { color: "#4d9fff", label: "Price" },
               { color: "#f5a623", label: "MA7", dash: true },
               { color: "#00d4aa", label: "MA25", dash: true },
+              { color: "#ff4d6a", label: "BB Upper" },
+              { color: "#ff4d6a", label: "BB Lower", dash: true },
+              { color: "#9b87f5", label: "EMA9" },
+              { color: "#ff7300", label: "MACD" },
+              { color: "#387908", label: "Signal" },
             ].map((l) => (
               <span key={l.label} className="flex items-center gap-1.5">
                 <span
@@ -203,34 +256,28 @@ export default function TAChart({ refreshKey }) {
                 <Line type="monotone" dataKey="price" stroke="#4d9fff" dot={false} strokeWidth={1.5} name="Price" />
                 <Line type="monotone" dataKey="ma7" stroke="#f5a623" dot={false} strokeWidth={1} strokeDasharray="4 4" name="MA7" />
                 <Line type="monotone" dataKey="ma25" stroke="#00d4aa" dot={false} strokeWidth={1} strokeDasharray="6 4" name="MA25" />
+                {/* New indicators */}
+                <Line type="monotone" dataKey="bbUpper" stroke="#ff4d6a" dot={false} strokeWidth={1} name="BB Upper" />
+                <Line type="monotone" dataKey="bbLower" stroke="#ff4d6a" dot={false} strokeWidth={1} strokeDasharray="2 2" name="BB Lower" />
+                <Line type="monotone" dataKey="ema9" stroke="#9b87f5" dot={false} strokeWidth={1} name="EMA9" />
               </LineChart>
             </ResponsiveContainer>
           </div>
 
-          {/* RSI */}
-          <div className="bg-bg-card border border-bg-border rounded-xl p-4">
-            <p className="text-xs text-slate-500 mb-3">RSI (14)</p>
-            <ResponsiveContainer width="100%" height={110}>
+          {/* MACD */}
+          <div className="bg-bg-card border border-bg-border rounded-xl p-4 mb-4">
+            <p className="text-xs text-slate-500 mb-3">MACD</p>
+            <ResponsiveContainer width="100%" height={120}>
               <LineChart data={chart} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                 <CartesianGrid stroke={gridColor} vertical={false} />
                 <XAxis dataKey="d" tick={tickStyle} interval="preserveStartEnd" />
-                <YAxis tick={tickStyle} domain={[0, 100]} ticks={[30, 50, 70]} width={30} />
+                <YAxis tick={tickStyle} width={30} />
                 <Tooltip content={<CustomTooltip />} />
-                <ReferenceLine y={70} stroke="#ff4d6a" strokeDasharray="3 3" />
-                <ReferenceLine y={30} stroke="#00d4aa" strokeDasharray="3 3" />
-                <Line type="monotone" dataKey="rsi" stroke="#9b87f5" dot={false} strokeWidth={1.5} name="rsi" />
+                <ReferenceLine y={0} stroke="#888" strokeDasharray="2 2" />
+                <Line type="monotone" dataKey="macd" stroke="#ff7300" dot={false} name="MACD" />
+                <Line type="monotone" dataKey="macdSignal" stroke="#387908" dot={false} name="Signal" />
               </LineChart>
             </ResponsiveContainer>
-
-            {latestRsi && (
-              <div className="flex items-center gap-3 mt-3 text-xs font-mono">
-                <span className="text-slate-500">RSI {latestRsi.toFixed(1)}</span>
-                <span className="font-medium" style={{ color: rsiSignal.color }}>
-                  {rsiSignal.label}
-                </span>
-                <span className="text-slate-600">— {rsiSignal.hint}</span>
-              </div>
-            )}
           </div>
         </div>
       )}

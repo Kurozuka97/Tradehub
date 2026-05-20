@@ -2,7 +2,7 @@ import "./globals.css";
 
 export const metadata = {
   title: "TradeHub",
-  description: "Crypto · Forex · TA · Journal",
+  description: "Crypto · Forex · TA · Buy/Sell",
 };
 
 export default function RootLayout({ children }) {

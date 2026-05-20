@@ -145,7 +145,7 @@ export default function TAChart({ refreshKey }) {
 
   useEffect(() => {
     load();
-  }, [refreshKey]);
+  }, [refreshKey, coin, days]);
 
   const latestRsi = chart.filter((x) => x.rsi !== null).slice(-1)[0]?.rsi;
   const rsiSignal =

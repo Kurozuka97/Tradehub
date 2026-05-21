@@ -41,14 +41,17 @@ export default function Home() {
             <h1 className="text-base font-semibold text-white leading-none">TradeHub</h1>
             <p className="text-xs text-slate-500 mt-0.5">Crypto · Forex · TA · Buy/Sell</p>
           </div>
-        </div>
-        <button
-          onClick={handleRefresh}
-          className="flex items-center gap-2 text-xs text-slate-400 hover:text-white bg-bg-card border border-bg-border px-3 py-1.5 rounded-lg transition-colors"
-        >
-          <RefreshCw size={13} />
-          Refresh
-        </button>
+</div>
+<div className="flex items-center gap-2">
+  <ThemeToggle />
+  <button
+    onClick={handleRefresh}
+    className="flex items-center gap-2 text-xs text-slate-400 hover:text-white bg-bg-card border border-bg-border px-3 py-1.5 rounded-lg transition-colors"
+  >
+    <RefreshCw size={13} />
+    Refresh
+  </button>
+</div>
       </header>
 
       {/* Tab Nav */}

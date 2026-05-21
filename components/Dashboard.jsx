@@ -1,8 +1,11 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { TrendingUp, TrendingDown, Minus, RefreshCw } from "lucide-react";
-import { LineChart, Line, ResponsiveContainer } from "recharts";
+// Recharts imported in CryptoSparkline component
+
+const CryptoSparkline = dynamic(() => import("./CryptoSparkline"), { ssr: false });
 
 const COINS = [
   { id: "bitcoin", sym: "BTC", name: "Bitcoin" },
@@ -122,13 +125,7 @@ export default function Dashboard({ refreshKey, onLastUpdated }) {
                 <div className="text-xs text-slate-300 mt-1">
                   {d?.myr ? `RM ${d.myr.toLocaleString()}` : ""}
                 </div>
-                {d?.sparkline_in_7d?.price?.length > 0 && (
-                  <ResponsiveContainer width="100%" height={40}>
-                    <LineChart data={d.sparkline_in_7d.price.map((price, i) => ({ price, index: i }))}>
-                      <Line type="monotone" dataKey="price" stroke="#4d9fff" dot={false} strokeWidth={1} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                )}
+                <CryptoSparkline data={d?.sparkline_in_7d?.price} />
 
             </div>
           );
@@ -149,13 +146,7 @@ export default function Dashboard({ refreshKey, onLastUpdated }) {
             <div className="font-mono text-sm font-medium text-white">
               {forex[f] ? forex[f].toFixed(4) : "—"}
             </div>
-            {forexHistory[f] && forexHistory[f].length > 0 && (
-              <ResponsiveContainer width="100%" height={40}>
-                <LineChart data={forexHistory[f].map((d) => ({ rate: d.rate, index: d.date }))}>
-                  <Line type="monotone" dataKey="rate" stroke="#4d9fff" dot={false} strokeWidth={1} />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
+                <CryptoSparkline data={forexHistory[f]?.map(item => item.rate)} />
           </div>
         ))}
       </div>

@@ -1,6 +1,3 @@
-import { useEffect, useState } from "react";
-import { Sun, Moon } from "lucide-react";
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -53,4 +50,3 @@ export default function ThemeToggle() {
     </div>
   );
 }
-

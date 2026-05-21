@@ -78,13 +78,13 @@ export default function Guide() {
         {CARDS.map((c) => (
           <div
             key={c.title}
-            className="bg-bg-card border border-bg-border rounded-xl p-5 flex gap-4 hover:border-slate-600 transition-colors"
+            className="bg-white dark:bg-bg-card border border-bg-border rounded-xl p-5 flex gap-4 hover:border-slate-600 transition-colors"
           >
             <div className={`w-9 h-9 rounded-lg ${c.bg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
               <c.icon size={18} className={c.color} />
             </div>
             <div>
-              <h3 className="text-sm font-medium text-white mb-1.5">{c.title}</h3>
+              <h3 className="text-sm font-medium text-slate-800 dark:text-white mb-1.5">{c.title}</h3>
               <p className="text-sm text-slate-500 leading-relaxed">{c.body}</p>
             </div>
           </div>

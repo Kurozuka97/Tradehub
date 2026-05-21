@@ -30,23 +30,23 @@ export default function Home() {
   const handleRefresh = () => setRefreshKey((k) => k + 1);
 
   return (
-    <div className="min-h-screen bg-bg-base text-slate-200">
+    <div className="min-h-screen bg-white dark:bg-bg-base text-slate-800 dark:text-slate-200">
       {/* Topbar */}
-      <header className="border-b border-bg-border bg-bg-surface px-6 py-4 flex items-center justify-between">
+      <header className="border-b border-bg-border bg-white dark:bg-bg-surface px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-brand-green/10 flex items-center justify-center">
             <span className="text-brand-green font-mono font-semibold text-sm">T</span>
           </div>
           <div>
-            <h1 className="text-base font-semibold text-white leading-none">TradeHub</h1>
-            <p className="text-xs text-slate-500 mt-0.5">Crypto · Forex · TA · Buy/Sell</p>
+            <h1 className="text-base font-semibold text-slate-800 dark:text-white leading-none">TradeHub</h1>
+            <p className="text-xs text-slate-500 dark:text-slate-300 mt-0.5">Crypto · Forex · TA · Buy/Sell</p>
           </div>
 </div>
 <div className="flex items-center gap-2">
   <ThemeToggle />
   <button
     onClick={handleRefresh}
-    className="flex items-center gap-2 text-xs text-slate-400 hover:text-white bg-bg-card border border-bg-border px-3 py-1.5 rounded-lg transition-colors"
+    className="flex items-center gap-2 text-xs text-slate-400 hover:text-white bg-white dark:bg-bg-card border border-bg-border px-3 py-1.5 rounded-lg transition-colors"
   >
     <RefreshCw size={13} />
     Refresh
@@ -55,7 +55,7 @@ export default function Home() {
       </header>
 
       {/* Tab Nav */}
-      <nav className="border-b border-bg-border bg-bg-surface px-6 flex gap-0">
+      <nav className="border-b border-bg-border bg-white dark:bg-bg-surface px-6 flex gap-0">
         {TABS.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -63,7 +63,7 @@ export default function Home() {
             className={`flex items-center gap-2 px-4 py-3 text-sm border-b-2 transition-colors ${
               tab === key
                 ? "border-brand-green text-brand-green font-medium"
-                : "border-transparent text-slate-500 hover:text-slate-300"
+                : "border-transparent text-slate-500 hover:text-slate-300 dark:text-slate-300"
             }`}
           >
             <Icon size={15} />

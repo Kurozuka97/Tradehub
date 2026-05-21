@@ -84,7 +84,7 @@ function computeRSI(arr, n = 14) {
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-bg-card border border-bg-border rounded-lg p-3 text-xs font-mono">
+    <div className="bg-white dark:bg-bg-card border border-bg-border rounded-lg p-3 text-xs font-mono">
       <p className="text-slate-400 mb-1">{label}</p>
       {payload.map((p) => (
         <p key={p.dataKey} style={{ color: p.color }}>
@@ -180,7 +180,7 @@ export default function TAChart({ refreshKey }) {
               className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
                 days === d
                   ? "bg-brand-green/10 border-brand-green/30 text-brand-green font-medium"
-                  : "bg-bg-card border-bg-border text-slate-400 hover:text-slate-200"
+                  : "bg-white dark:bg-bg-card border-bg-border text-slate-400 hover:text-slate-200"
               }`}
             >
               {d}D
@@ -191,7 +191,7 @@ export default function TAChart({ refreshKey }) {
         <button
           onClick={load}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-bg-card border border-bg-border text-slate-400 hover:text-white transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-white dark:bg-bg-card border border-bg-border text-slate-400 hover:text-white transition-colors"
         >
           <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
           Fetch
@@ -240,7 +240,7 @@ export default function TAChart({ refreshKey }) {
           </div>
 
           {/* Price + MA */}
-          <div className="bg-bg-card border border-bg-border rounded-xl p-4 mb-4">
+          <div className="bg-white dark:bg-bg-card border border-bg-border rounded-xl p-4 mb-4">
             <p className="text-xs text-slate-500 mb-3">Price + Moving Averages</p>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={chart} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
@@ -265,7 +265,7 @@ export default function TAChart({ refreshKey }) {
           </div>
 
           {/* MACD */}
-          <div className="bg-bg-card border border-bg-border rounded-xl p-4 mb-4">
+          <div className="bg-white dark:bg-bg-card border border-bg-border rounded-xl p-4 mb-4">
             <p className="text-xs text-slate-500 mb-3">MACD</p>
             <ResponsiveContainer width="100%" height={120}>
               <LineChart data={chart} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>

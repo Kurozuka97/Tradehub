@@ -1,29 +1,50 @@
 import { useEffect, useState } from "react";
 import { Sun, Moon } from "lucide-react";
 
-export default function ThemeToggle() {
-  const [isDark, setIsDark] = useState(
-    typeof window !== "undefined" &&
-      (localStorage.getItem("theme") === "dark" ||
-        (!localStorage.getItem("theme") &&
-          window.matchMedia("(prefers-color-scheme: dark)").matches))
-  );
+"use client";
 
-  useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
+import { useEffect, useState } from "react";
+import { Sun, Moon } from "lucide-react";
+
+export default function ThemeToggle() {
+  // Initialize from stored theme or current class
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window !== "undefined") {
+      return document.documentElement.classList.contains("dark");
     }
-    localStorage.setItem("theme", isDark ? "dark" : "light");
-    console.log("Theme toggled: ", isDark ? "dark" : "light");
-  }, [isDark]);
+    return false;
+  });
+
+  // Apply stored preference on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("theme");
+      if (stored) {
+        const shouldBeDark = stored === "dark";
+        const html = document.documentElement;
+        if (shouldBeDark) {
+          html.classList.add("dark");
+        } else {
+          html.classList.remove("dark");
+        }
+        setIsDark(shouldBeDark);
+      }
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const html = document.documentElement;
+    const nowDark = html.classList.toggle("dark");
+    setIsDark(nowDark);
+    localStorage.setItem("theme", nowDark ? "dark" : "light");
+    console.log("Theme toggled:", nowDark ? "dark" : "light");
+  };
 
   return (
     <div className="flex items-center gap-1">
       <button
-        onClick={() => setIsDark((prev) => !prev)}
-        className="p-1 rounded bg-bg-card hover:bg-bg-border text-slate-400 hover:text-slate-200 transition-colors"
+        onClick={toggleTheme}
+        className="p-1 rounded bg-white dark:bg-bg-card hover:bg-bg-border text-slate-400 hover:text-slate-200 transition-colors"
         aria-label="Toggle dark mode"
       >
         {isDark ? <Sun size={16} /> : <Moon size={16} />}
@@ -32,3 +53,4 @@ export default function ThemeToggle() {
     </div>
   );
 }
+

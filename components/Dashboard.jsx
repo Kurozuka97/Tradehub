@@ -88,7 +88,7 @@ export default function Dashboard({ refreshKey }) {
           return (
             <div
               key={c.id}
-              className="bg-white dark:bg-bg-card border border-bg-border rounded-xl p-4 hover:border-slate-600 transition-colors"
+              className="bg-bg-card border border-bg-border rounded-xl p-4 hover:border-slate-600 transition-colors"
             >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-slate-500">{c.sym}</span>
@@ -130,7 +130,7 @@ export default function Dashboard({ refreshKey }) {
         {FOREX.map((f) => (
           <div
             key={f}
-            className="bg-white dark:bg-bg-card border border-bg-border rounded-xl p-4 hover:border-slate-600 transition-colors"
+            className="bg-bg-card border border-bg-border rounded-xl p-4 hover:border-slate-600 transition-colors"
           >
             <div className="text-xs text-slate-500 mb-2">USD/{f}</div>
             <div className="font-mono text-sm font-medium text-slate-800 dark:text-white">

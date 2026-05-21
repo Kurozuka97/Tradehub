@@ -130,7 +130,7 @@ export default function BuySell() {
           { label: "Best Trade", value: `+$${best.toFixed(2)}`, color: "text-brand-green" },
           { label: "Worst Trade", value: `$${worst.toFixed(2)}`, color: "text-brand-red" },
         ].map((m) => (
-          <div key={m.label} className="bg-white dark:bg-bg-card border border-bg-border rounded-xl p-4 text-center">
+          <div key={m.label} className="bg-bg-card border border-bg-border rounded-xl p-4 text-center">
             <p className="text-xs text-slate-500 mb-1">{m.label}</p>
             <p className={`font-mono text-lg font-medium ${m.color}`}>{m.value}</p>
           </div>
@@ -142,7 +142,7 @@ export default function BuySell() {
         <div className="flex justify-end mb-4">
           <button
             onClick={exportCSV}
-            className="px-3 py-1.5 rounded-lg text-xs bg-white dark:bg-bg-card border border-bg-border text-slate-400 hover:text-white transition-colors"
+            className="px-3 py-1.5 rounded-lg text-xs bg-bg-card border border-bg-border text-slate-400 hover:text-white transition-colors"
           >
             Export CSV
           </button>
@@ -165,7 +165,7 @@ export default function BuySell() {
 
       {/* Form */}
       {showForm && (
-        <div className="bg-white dark:bg-bg-card border border-bg-border rounded-xl p-5 mb-5">
+        <div className="bg-bg-card border border-bg-border rounded-xl p-5 mb-5">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
             {[
               { label: "Date", type: "date", key: "date", placeholder: "" },
@@ -237,7 +237,7 @@ export default function BuySell() {
             return (
               <div
                 key={t.id}
-                className="bg-white dark:bg-bg-card border border-bg-border rounded-xl px-4 py-3 flex items-center justify-between hover:border-slate-600 transition-colors"
+                className="bg-bg-card border border-bg-border rounded-xl px-4 py-3 flex items-center justify-between hover:border-slate-600 transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <span

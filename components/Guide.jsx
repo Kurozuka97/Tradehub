@@ -78,7 +78,7 @@ export default function Guide() {
         {CARDS.map((c) => (
           <div
             key={c.title}
-            className="bg-white dark:bg-bg-card border border-bg-border rounded-xl p-5 flex gap-4 hover:border-slate-600 transition-colors"
+            className="bg-bg-card border border-bg-border rounded-xl p-5 flex gap-4 hover:border-slate-600 transition-colors"
           >
             <div className={`w-9 h-9 rounded-lg ${c.bg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
               <c.icon size={18} className={c.color} />

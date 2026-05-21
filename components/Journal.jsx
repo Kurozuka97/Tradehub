@@ -255,7 +255,7 @@ export default function BuySell() {
                     {t.type}
                   </span>
                   <div>
-                    <p className="text-sm font-medium text-slate-800 dark:text-white">{t.pair}</p>
+                    <p className="text-sm font-medium text-white">{t.pair}</p>
                     <p className="text-xs text-slate-500">
                       {t.date} · ${t.entry.toLocaleString()} → ${t.exit.toLocaleString()} · ×{t.size}
                       {t.stopLoss !== undefined && t.stopLoss !== null && t.stopLoss !== "" && (

@@ -84,7 +84,7 @@ export default function Guide() {
               <c.icon size={18} className={c.color} />
             </div>
             <div>
-              <h3 className="text-sm font-medium text-slate-800 dark:text-white mb-1.5">{c.title}</h3>
+              <h3 className="text-sm font-medium text-white mb-1.5">{c.title}</h3>
               <p className="text-sm text-slate-500 leading-relaxed">{c.body}</p>
             </div>
           </div>

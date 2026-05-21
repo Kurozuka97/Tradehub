@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 
-// ThemeToggle import removed
+
 import Dashboard from "@/components/Dashboard";
 import TAChart from "@/components/TAChart";
-// ThemeToggle import removed
+
 import BuySell from "@/components/Journal";
 import Guide from "@/components/Guide";
 import {
@@ -63,7 +63,7 @@ export default function Home() {
             className={`flex items-center gap-2 px-4 py-3 text-sm border-b-2 transition-colors ${
               tab === key
                 ? "border-brand-green text-brand-green font-medium"
-                : "border-transparent text-slate-500 hover:text-slate-300"
+                : "border-transparent text-slate-300 hover:text-slate-300"
             }`}
           >
             <Icon size={15} />

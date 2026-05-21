@@ -26,6 +26,7 @@ const TABS = [
 export default function Home() {
   const [tab, setTab] = useState("dashboard");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   const handleRefresh = () => setRefreshKey((k) => k + 1);
 
@@ -50,8 +51,13 @@ export default function Home() {
   >
     <RefreshCw size={13} />
     Refresh
-  </button>
-</div>
+    </button>
+    {lastUpdated && (
+      <span className="text-xs text-slate-300 ml-2">
+        Last updated: {lastUpdated.toLocaleTimeString()}
+      </span>
+    )}
+  </div>
       </header>
 
       {/* Tab Nav */}
@@ -74,7 +80,7 @@ export default function Home() {
 
       {/* Content */}
       <main className="px-6 py-6 max-w-5xl mx-auto">
-        {tab === "dashboard" && <Dashboard refreshKey={refreshKey} />}
+        {tab === "dashboard" && <Dashboard refreshKey={refreshKey} onLastUpdated={setLastUpdated} />}
         {tab === "ta" && <TAChart refreshKey={refreshKey} />}
         {tab === "buysell" && <BuySell />}
         {tab === "guide" && <Guide />}

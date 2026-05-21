@@ -17,7 +17,7 @@ const COINS = [
 
 const FOREX = ["MYR", "SGD", "EUR", "GBP", "JPY", "AUD", "CNY"];
 
-export default function Dashboard({ refreshKey }) {
+export default function Dashboard({ refreshKey, onLastUpdated }) {
   const [prices, setPrices] = useState({});
   const [forex, setForex] = useState({});
   const [forexHistory, setForexHistory] = useState({});
@@ -43,7 +43,9 @@ export default function Dashboard({ refreshKey }) {
         const forexRes = await fetch('/api/forex/history');
         const forexHist = await forexRes.json();
         setForexHistory(forexHist.history || {});
-        setLastUpdated(new Date());
+        const now = new Date();
+        setLastUpdated(now);
+        if (onLastUpdated) onLastUpdated(now);
     } catch {
       setError("Failed to fetch live data. Retrying in 60s...");
     }
@@ -76,11 +78,7 @@ export default function Dashboard({ refreshKey }) {
         </div>
       )}
 
-      {lastUpdated && (
-        <p className="text-xs text-slate-300 mb-4">
-          Last updated: {lastUpdated.toLocaleTimeString()}
-        </p>
-      )}
+
 
       {/* Crypto */}
       <h2 className="text-xs font-medium text-slate-300 uppercase tracking-widest mb-3">

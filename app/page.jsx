@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import ThemeToggle from "@/components/ThemeToggle";
 import Dashboard from "@/components/Dashboard";
 import TAChart from "@/components/TAChart";
+import ThemeToggle from "@/components/ThemeToggle";
 import BuySell from "@/components/Journal";
 import Guide from "@/components/Guide";
 import {

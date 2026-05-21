@@ -21,6 +21,7 @@ export default function Dashboard({ refreshKey }) {
   const [prices, setPrices] = useState({});
   const [priceHistory, setPriceHistory] = useState({});
   const [forex, setForex] = useState({});
+  const [forexHistory, setForexHistory] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -51,7 +52,11 @@ export default function Dashboard({ refreshKey }) {
          }
        });
        setPriceHistory(historyMap);
-       setLastUpdated(new Date());
+        // Fetch 30‑day forex history for each symbol
+        const forexRes = await fetch('/api/forex/history');
+        const forexHist = await forexRes.json();
+        setForexHistory(forexHist.history || {});
+        setLastUpdated(new Date());
     } catch {
       setError("Failed to fetch live data. Retrying in 60s...");
     }
@@ -158,6 +163,13 @@ export default function Dashboard({ refreshKey }) {
             <div className="font-mono text-sm font-medium text-white">
               {forex[f] ? forex[f].toFixed(4) : "—"}
             </div>
+            {forexHistory[f] && forexHistory[f].length > 0 && (
+              <ResponsiveContainer width="100%" height={40}>
+                <LineChart data={forexHistory[f].map((d) => ({ rate: d.rate, index: d.date }))}>
+                  <Line type="monotone" dataKey="rate" stroke="#4d9fff" dot={false} strokeWidth={1} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
         ))}
       </div>

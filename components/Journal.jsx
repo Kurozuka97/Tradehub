@@ -227,7 +227,7 @@ export default function BuySell() {
 
       {/* Trades List */}
       {trades.length === 0 ? (
-        <div className="text-center py-12 text-slate-600 text-sm">
+        <div className="text-center py-12 text-slate-300 text-sm">
           No trades yet. Log your first trade above.
         </div>
       ) : (
@@ -259,12 +259,12 @@ export default function BuySell() {
                     <p className="text-xs text-slate-300">
                       {t.date} · ${t.entry.toLocaleString()} → ${t.exit.toLocaleString()} · ×{t.size}
                       {t.stopLoss !== undefined && t.stopLoss !== null && t.stopLoss !== "" && (
-                        <span className="text-slate-600"> · SL ${t.stopLoss}</span>
+                        <span className="text-slate-300"> · SL ${t.stopLoss}</span>
                       )}
                       {t.takeProfit !== undefined && t.takeProfit !== null && t.takeProfit !== "" && (
-                        <span className="text-slate-600"> · TP ${t.takeProfit}</span>
+                        <span className="text-slate-300"> · TP ${t.takeProfit}</span>
                       )}
-                      {t.note && <span className="text-slate-600"> · {t.note}</span>}
+                      {t.note && <span className="text-slate-300"> · {t.note}</span>}
                     </p>
                   </div>
                 </div>
@@ -274,7 +274,7 @@ export default function BuySell() {
                   </span>
                   <button
                     onClick={() => del(t.id)}
-                    className="text-slate-600 hover:text-brand-red transition-colors p-1 rounded"
+                    className="text-slate-300 hover:text-brand-red transition-colors p-1 rounded"
                   >
                     <Trash2 size={14} />
                   </button>

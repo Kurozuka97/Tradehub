@@ -70,7 +70,7 @@ export default function Dashboard({ refreshKey }) {
       )}
 
       {lastUpdated && (
-        <p className="text-xs text-slate-600 mb-4">
+        <p className="text-xs text-slate-300 mb-4">
           Last updated: {lastUpdated.toLocaleTimeString()}
         </p>
       )}
@@ -114,7 +114,7 @@ export default function Dashboard({ refreshKey }) {
                   ? `${isUp ? "+" : ""}${chg.toFixed(2)}%`
                   : "—"}
               </div>
-              <div className="text-xs text-slate-600 mt-1">
+              <div className="text-xs text-slate-300 mt-1">
                 {d?.myr ? `RM ${d.myr.toLocaleString()}` : ""}
               </div>
             </div>

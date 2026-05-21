@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { TrendingUp, TrendingDown, Minus, RefreshCw } from "lucide-react";
+import { LineChart, Line, ResponsiveContainer } from "recharts";
 
 const COINS = [
   { id: "bitcoin", sym: "BTC", name: "Bitcoin" },
@@ -18,6 +19,7 @@ const FOREX = ["MYR", "SGD", "EUR", "GBP", "JPY", "AUD", "CNY"];
 
 export default function Dashboard({ refreshKey }) {
   const [prices, setPrices] = useState({});
+  const [priceHistory, setPriceHistory] = useState({});
   const [forex, setForex] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -34,9 +36,19 @@ export default function Dashboard({ refreshKey }) {
       const cd = await cr.json();
       const fd = await fr.json();
       if (cd.error || fd.error) throw new Error("upstream");
-      setPrices(cd);
-      setForex(fd.rates || {});
-      setLastUpdated(new Date());
+       setPrices(cd);
+       setForex(fd.rates || {});
+       // Fetch 7‑day price history for each coin for sparkline graphs
+       const historyResponses = await Promise.all(
+         COINS.map((c) => fetch(`/api/crypto/history?coin=${c.id}`).then((r) => r.json()))
+       );
+       const historyMap = {};
+       historyResponses.forEach((data, idx) => {
+         const priceSeries = data.prices?.map((p) => p[1]) ?? [];
+         historyMap[COINS[idx].id] = priceSeries;
+       });
+       setPriceHistory(historyMap);
+       setLastUpdated(new Date());
     } catch {
       setError("Failed to fetch live data. Retrying in 60s...");
     }
@@ -102,21 +114,28 @@ export default function Dashboard({ refreshKey }) {
                   )
                 ) : null}
               </div>
-              <div className="font-mono text-sm font-medium text-white mb-1">
-                {d ? `$${d.usd.toLocaleString()}` : "—"}
-              </div>
-              <div
-                className={`text-xs font-mono ${
-                  isUp ? "text-brand-green" : isDown ? "text-brand-red" : "text-slate-300"
-                }`}
-              >
-                {chg !== undefined
-                  ? `${isUp ? "+" : ""}${chg.toFixed(2)}%`
-                  : "—"}
-              </div>
-              <div className="text-xs text-slate-300 mt-1">
-                {d?.myr ? `RM ${d.myr.toLocaleString()}` : ""}
-              </div>
+               <div className="font-mono text-sm font-medium text-white mb-1">
+                 {d ? `$${d.usd.toLocaleString()}` : "—"}
+               </div>
+               <div
+                 className={`text-xs font-mono ${
+                   isUp ? "text-brand-green" : isDown ? "text-brand-red" : "text-slate-300"
+                 }`}
+               >
+                 {chg !== undefined
+                   ? `${isUp ? "+" : ""}${chg.toFixed(2)}%`
+                   : "—"}
+               </div>
+               <div className="text-xs text-slate-300 mt-1">
+                 {d?.myr ? `RM ${d.myr.toLocaleString()}` : ""}
+               </div>
+               {priceHistory[c.id] && priceHistory[c.id].length > 0 && (
+                 <ResponsiveContainer width="100%" height={40}>
+                   <LineChart data={priceHistory[c.id].map((price, i) => ({ price, index: i }))}>
+                     <Line type="monotone" dataKey="price" stroke="#4d9fff" dot={false} strokeWidth={1} />
+                   </LineChart>
+                 </ResponsiveContainer>
+               )}
             </div>
           );
         })}

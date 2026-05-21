@@ -54,7 +54,7 @@ export default function Dashboard({ refreshKey }) {
 
   if (loading && Object.keys(prices).length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-slate-500 gap-2">
+      <div className="flex items-center justify-center h-48 text-slate-300 gap-2">
         <RefreshCw size={16} className="animate-spin" />
         <span className="text-sm">Fetching live prices...</span>
       </div>
@@ -76,7 +76,7 @@ export default function Dashboard({ refreshKey }) {
       )}
 
       {/* Crypto */}
-      <h2 className="text-xs font-medium text-slate-500 uppercase tracking-widest mb-3">
+      <h2 className="text-xs font-medium text-slate-300 uppercase tracking-widest mb-3">
         Cryptocurrency
       </h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
@@ -91,14 +91,14 @@ export default function Dashboard({ refreshKey }) {
               className="bg-bg-card border border-bg-border rounded-xl p-4 hover:border-slate-600 transition-colors"
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-slate-500">{c.sym}</span>
+                <span className="text-xs font-medium text-slate-300">{c.sym}</span>
                 {chg !== undefined ? (
                   isUp ? (
                     <TrendingUp size={13} className="text-brand-green" />
                   ) : isDown ? (
                     <TrendingDown size={13} className="text-brand-red" />
                   ) : (
-                    <Minus size={13} className="text-slate-500" />
+                    <Minus size={13} className="text-slate-300" />
                   )
                 ) : null}
               </div>
@@ -107,7 +107,7 @@ export default function Dashboard({ refreshKey }) {
               </div>
               <div
                 className={`text-xs font-mono ${
-                  isUp ? "text-brand-green" : isDown ? "text-brand-red" : "text-slate-500"
+                  isUp ? "text-brand-green" : isDown ? "text-brand-red" : "text-slate-300"
                 }`}
               >
                 {chg !== undefined
@@ -123,7 +123,7 @@ export default function Dashboard({ refreshKey }) {
       </div>
 
       {/* Forex */}
-      <h2 className="text-xs font-medium text-slate-500 uppercase tracking-widest mb-3">
+      <h2 className="text-xs font-medium text-slate-300 uppercase tracking-widest mb-3">
         Forex — 1 USD =
       </h2>
       <div className="grid grid-cols-3 sm:grid-cols-7 gap-3">
@@ -132,7 +132,7 @@ export default function Dashboard({ refreshKey }) {
             key={f}
             className="bg-bg-card border border-bg-border rounded-xl p-4 hover:border-slate-600 transition-colors"
           >
-            <div className="text-xs text-slate-500 mb-2">USD/{f}</div>
+            <div className="text-xs text-slate-300 mb-2">USD/{f}</div>
             <div className="font-mono text-sm font-medium text-white">
               {forex[f] ? forex[f].toFixed(4) : "—"}
             </div>

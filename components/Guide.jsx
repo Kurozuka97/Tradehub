@@ -71,7 +71,7 @@ const CARDS = [
 export default function Guide() {
   return (
     <div>
-      <p className="text-xs text-slate-500 uppercase tracking-widest font-medium mb-5">
+      <p className="text-xs text-slate-300 uppercase tracking-widest font-medium mb-5">
         Trading Fundamentals
       </p>
       <div className="grid sm:grid-cols-2 gap-4">
@@ -85,7 +85,7 @@ export default function Guide() {
             </div>
             <div>
               <h3 className="text-sm font-medium text-white mb-1.5">{c.title}</h3>
-              <p className="text-sm text-slate-500 leading-relaxed">{c.body}</p>
+              <p className="text-sm text-slate-300 leading-relaxed">{c.body}</p>
             </div>
           </div>
         ))}

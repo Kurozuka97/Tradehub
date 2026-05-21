@@ -80,7 +80,7 @@ export default function BuySell() {
   const best = trades.length ? Math.max(...trades.map(calcPnL)) : 0;
   const worst = trades.length ? Math.min(...trades.map(calcPnL)) : 0;
 
-  const pnlColor = (v) => (v > 0 ? "text-brand-green" : v < 0 ? "text-brand-red" : "text-slate-500");
+  const pnlColor = (v) => (v > 0 ? "text-brand-green" : v < 0 ? "text-brand-red" : "text-slate-300");
 
   const exportCSV = () => {
     const header = [
@@ -131,7 +131,7 @@ export default function BuySell() {
           { label: "Worst Trade", value: `$${worst.toFixed(2)}`, color: "text-brand-red" },
         ].map((m) => (
           <div key={m.label} className="bg-bg-card border border-bg-border rounded-xl p-4 text-center">
-            <p className="text-xs text-slate-500 mb-1">{m.label}</p>
+            <p className="text-xs text-slate-300 mb-1">{m.label}</p>
             <p className={`font-mono text-lg font-medium ${m.color}`}>{m.value}</p>
           </div>
         ))}
@@ -151,7 +151,7 @@ export default function BuySell() {
 
       {/* Add Trade */}
       <div className="flex justify-between items-center mb-4">
-        <p className="text-xs text-slate-500 uppercase tracking-widest font-medium">
+        <p className="text-xs text-slate-300 uppercase tracking-widest font-medium">
           Trade History ({trades.length})
         </p>
         <button
@@ -177,7 +177,7 @@ export default function BuySell() {
               { label: "Take Profit ($)", type: "number", key: "takeProfit", placeholder: "optional" },
             ].map((f) => (
               <div key={f.key}>
-                <label className="block text-xs text-slate-500 mb-1.5">{f.label}</label>
+                <label className="block text-xs text-slate-300 mb-1.5">{f.label}</label>
                 <input
                   type={f.type}
                   placeholder={f.placeholder}
@@ -188,7 +188,7 @@ export default function BuySell() {
               </div>
             ))}
             <div>
-              <label className="block text-xs text-slate-500 mb-1.5">Type</label>
+              <label className="block text-xs text-slate-300 mb-1.5">Type</label>
               <select
                 value={form.type}
                 onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}
@@ -200,7 +200,7 @@ export default function BuySell() {
             </div>
           </div>
           <div className="mb-4">
-            <label className="block text-xs text-slate-500 mb-1.5">Note (optional)</label>
+            <label className="block text-xs text-slate-300 mb-1.5">Note (optional)</label>
             <input
               type="text"
               placeholder="e.g. breakout play, followed plan..."
@@ -219,7 +219,7 @@ export default function BuySell() {
           </div>
 
           {/* Disclaimer */}
-          <p className="mt-2 text-xs text-slate-500 italic">
+          <p className="mt-2 text-xs text-slate-300 italic">
             ⚠️ AI analysis only – not a trade recommendation. Conduct your own research.
           </p>
         </div>
@@ -256,7 +256,7 @@ export default function BuySell() {
                   </span>
                   <div>
                     <p className="text-sm font-medium text-white">{t.pair}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-slate-300">
                       {t.date} · ${t.entry.toLocaleString()} → ${t.exit.toLocaleString()} · ×{t.size}
                       {t.stopLoss !== undefined && t.stopLoss !== null && t.stopLoss !== "" && (
                         <span className="text-slate-600"> · SL ${t.stopLoss}</span>

@@ -205,7 +205,7 @@ export default function TAChart({ refreshKey }) {
       )}
 
       {loading && chart.length === 0 && (
-        <div className="flex items-center justify-center h-48 text-slate-500 gap-2">
+        <div className="flex items-center justify-center h-48 text-slate-300 gap-2">
           <RefreshCw size={16} className="animate-spin" />
           <span className="text-sm">Loading chart data...</span>
         </div>
@@ -214,7 +214,7 @@ export default function TAChart({ refreshKey }) {
       {!loading && chart.length > 0 && (
         <div>
           {/* Legend */}
-          <div className="flex gap-4 mb-3 text-xs text-slate-500">
+          <div className="flex gap-4 mb-3 text-xs text-slate-300">
             {[
               { color: "#4d9fff", label: "Price" },
               { color: "#f5a623", label: "MA7", dash: true },
@@ -241,7 +241,7 @@ export default function TAChart({ refreshKey }) {
 
           {/* Price + MA */}
           <div className="bg-bg-card border border-bg-border rounded-xl p-4 mb-4">
-            <p className="text-xs text-slate-500 mb-3">Price + Moving Averages</p>
+            <p className="text-xs text-slate-300 mb-3">Price + Moving Averages</p>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={chart} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                 <CartesianGrid stroke={gridColor} vertical={false} />
@@ -266,7 +266,7 @@ export default function TAChart({ refreshKey }) {
 
           {/* MACD */}
           <div className="bg-bg-card border border-bg-border rounded-xl p-4 mb-4">
-            <p className="text-xs text-slate-500 mb-3">MACD</p>
+            <p className="text-xs text-slate-300 mb-3">MACD</p>
             <ResponsiveContainer width="100%" height={120}>
               <LineChart data={chart} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                 <CartesianGrid stroke={gridColor} vertical={false} />

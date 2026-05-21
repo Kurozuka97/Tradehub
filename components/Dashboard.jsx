@@ -39,13 +39,16 @@ export default function Dashboard({ refreshKey }) {
        setPrices(cd);
        setForex(fd.rates || {});
        // Fetch 7‑day price history for each coin for sparkline graphs
-       const historyResponses = await Promise.all(
+       const historyResponses = await Promise.allSettled(
          COINS.map((c) => fetch(`/api/crypto/history?coin=${c.id}`).then((r) => r.json()))
        );
        const historyMap = {};
-       historyResponses.forEach((data, idx) => {
-         const priceSeries = data.prices?.map((p) => p[1]) ?? [];
-         historyMap[COINS[idx].id] = priceSeries;
+       historyResponses.forEach((result, idx) => {
+         if (result.status === 'fulfilled') {
+           const data = result.value;
+           const priceSeries = data.prices?.map((p) => p[1]) ?? [];
+           historyMap[COINS[idx].id] = priceSeries;
+         }
        });
        setPriceHistory(historyMap);
        setLastUpdated(new Date());

@@ -19,7 +19,6 @@ const FOREX = ["MYR", "SGD", "EUR", "GBP", "JPY", "AUD", "CNY"];
 
 export default function Dashboard({ refreshKey }) {
   const [prices, setPrices] = useState({});
-  const [priceHistory, setPriceHistory] = useState({});
   const [forex, setForex] = useState({});
   const [forexHistory, setForexHistory] = useState({});
   const [loading, setLoading] = useState(true);
@@ -39,19 +38,7 @@ export default function Dashboard({ refreshKey }) {
       if (cd.error || fd.error) throw new Error("upstream");
        setPrices(cd);
        setForex(fd.rates || {});
-       // Fetch 7‑day price history for each coin for sparkline graphs
-       const historyResponses = await Promise.allSettled(
-         COINS.map((c) => fetch(`/api/crypto/history?coin=${c.id}`).then((r) => r.json()))
-       );
-       const historyMap = {};
-       historyResponses.forEach((result, idx) => {
-         if (result.status === 'fulfilled') {
-           const data = result.value;
-           const priceSeries = data.prices?.map((p) => p[1]) ?? [];
-           historyMap[COINS[idx].id] = priceSeries;
-         }
-       });
-       setPriceHistory(historyMap);
+
         // Fetch 30‑day forex history for each symbol
         const forexRes = await fetch('/api/forex/history');
         const forexHist = await forexRes.json();
@@ -134,16 +121,17 @@ export default function Dashboard({ refreshKey }) {
                    ? `${isUp ? "+" : ""}${chg.toFixed(2)}%`
                    : "—"}
                </div>
-               <div className="text-xs text-slate-300 mt-1">
-                 {d?.myr ? `RM ${d.myr.toLocaleString()}` : ""}
-               </div>
-               {priceHistory[c.id] && priceHistory[c.id].length > 0 && (
-                 <ResponsiveContainer width="100%" height={40}>
-                   <LineChart data={priceHistory[c.id].map((price, i) => ({ price, index: i }))}>
-                     <Line type="monotone" dataKey="price" stroke="#4d9fff" dot={false} strokeWidth={1} />
-                   </LineChart>
-                 </ResponsiveContainer>
-               )}
+                <div className="text-xs text-slate-300 mt-1">
+                  {d?.myr ? `RM ${d.myr.toLocaleString()}` : ""}
+                </div>
+                {d?.sparkline_in_7d?.price?.length > 0 && (
+                  <ResponsiveContainer width="100%" height={40}>
+                    <LineChart data={d.sparkline_in_7d.price.map((price, i) => ({ price, index: i }))}>
+                      <Line type="monotone" dataKey="price" stroke="#4d9fff" dot={false} strokeWidth={1} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+
             </div>
           );
         })}

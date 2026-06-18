@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-
 import Dashboard from "@/components/Dashboard";
 import TAChart from "@/components/TAChart";
 import BuySell from "@/components/Journal";
@@ -12,6 +11,7 @@ import {
   BookOpen,
   Zap,
   RefreshCw,
+  Bell,
 } from "lucide-react";
 
 const TABS = [
@@ -25,8 +25,18 @@ export default function Home() {
   const [tab, setTab] = useState("dashboard");
   const [refreshKey, setRefreshKey] = useState(0);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [aiAlerts, setAiAlerts] = useState([]);
 
   const handleRefresh = () => setRefreshKey((k) => k + 1);
+
+  const addAlert = (alert) => {
+    setAiAlerts((prev) => {
+      const filtered = prev.filter(
+        (a) => !(a.pair === alert.pair && a.signal === alert.signal)
+      );
+      return [alert, ...filtered].slice(0, 20);
+    });
+  };
 
   return (
     <div className="min-h-screen bg-bg-base text-slate-200">
@@ -38,10 +48,17 @@ export default function Home() {
           </div>
           <div>
             <h1 className="text-base font-semibold text-white leading-none">TradeHub</h1>
-            <p className="text-xs text-slate-300 mt-0.5">Crypto · Forex · TA · Buy/Sell · Live</p>
+            <p className="text-xs text-slate-300 mt-0.5">Crypto · Forex · TA · Buy/Sell · Live · AI Signals</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* AI Alert Badge */}
+          {aiAlerts.length > 0 && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand-amber/10 border border-brand-amber/30">
+              <Bell size={12} className="text-brand-amber" />
+              <span className="text-xs text-brand-amber font-medium">{aiAlerts.length} AI Signal{aiAlerts.length > 1 ? "s" : ""}</span>
+            </div>
+          )}
           <button
             onClick={handleRefresh}
             className="flex items-center gap-2 text-xs text-slate-400 hover:text-white bg-bg-card border border-bg-border px-3 py-1.5 rounded-lg transition-colors"
@@ -77,8 +94,8 @@ export default function Home() {
 
       {/* Content */}
       <main className="px-6 py-6 max-w-5xl mx-auto">
-        {tab === "dashboard" && <Dashboard refreshKey={refreshKey} onLastUpdated={setLastUpdated} />}
-        {tab === "live" && <LiveChart />}
+        {tab === "dashboard" && <Dashboard refreshKey={refreshKey} onLastUpdated={setLastUpdated} aiAlerts={aiAlerts} />}
+        {tab === "live" && <LiveChart onAiAlert={addAlert} />}
         {tab === "ta" && <TAChart refreshKey={refreshKey} />}
         {tab === "buysell" && <BuySell />}
       </main>

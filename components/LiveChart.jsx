@@ -35,7 +35,25 @@ const INTERVALS = [
   { key: "1d", label: "1D" },
 ];
 
-// AI Signal Engine — runs entirely client-side using technical indicators
+function formatPrice(val) {
+  if (val == null || isNaN(val)) return "—";
+  try {
+    if (val >= 1000) {
+      return val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+    if (val >= 1) {
+      return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    if (val >= 0.01) {
+      return val.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+    }
+    return val.toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 6 });
+  } catch {
+    return val.toFixed(2);
+  }
+}
+
+// AI Signal Engine
 function analyzeSignal(candles, volumes) {
   if (candles.length < 30) return null;
 
@@ -43,11 +61,9 @@ function analyzeSignal(candles, volumes) {
   const highs = candles.map((c) => c.high);
   const lows = candles.map((c) => c.low);
 
-  // RSI
   const rsi = computeRSI(closes, 14);
   const lastRSI = rsi[rsi.length - 1];
 
-  // EMA cross
   const ema9 = computeEMA(closes, 9);
   const ema21 = computeEMA(closes, 21);
   const emaCross = ema9[ema9.length - 1] > ema21[ema21.length - 1];
@@ -55,12 +71,10 @@ function analyzeSignal(candles, volumes) {
   const goldenCross = emaCross && !prevEmaCross;
   const deathCross = !emaCross && prevEmaCross;
 
-  // Volume spike
   const avgVol = volumes.slice(-20).reduce((a, b) => a + b, 0) / 20;
   const lastVol = volumes[volumes.length - 1];
   const volSpike = lastVol > avgVol * 1.5;
 
-  // Support/Resistance bounce
   const recentLows = lows.slice(-20);
   const recentHighs = highs.slice(-20);
   const support = Math.min(...recentLows);
@@ -69,7 +83,6 @@ function analyzeSignal(candles, volumes) {
   const nearSupport = lastClose < support * 1.02;
   const nearResistance = lastClose > resistance * 0.98;
 
-  // MACD
   const macdData = computeMACD(closes);
   const macdHist = macdData.hist;
   const macdRising = macdHist[macdHist.length - 1] > macdHist[macdHist.length - 2];
@@ -78,30 +91,23 @@ function analyzeSignal(candles, volumes) {
   let confidence = 0;
   let reasons = [];
 
-  // BUY conditions
   if (lastRSI < 35 && nearSupport && macdRising) {
     signal = "BUY";
     confidence = 75;
     reasons = ["RSI oversold", "Near support", "MACD rising"];
     if (goldenCross) { confidence = 90; reasons.push("EMA golden cross"); }
     if (volSpike) { confidence = Math.min(confidence + 5, 95); reasons.push("Volume spike"); }
-  }
-  // SELL conditions
-  else if (lastRSI > 65 && nearResistance && !macdRising) {
+  } else if (lastRSI > 65 && nearResistance && !macdRising) {
     signal = "SELL";
     confidence = 75;
     reasons = ["RSI overbought", "Near resistance", "MACD falling"];
     if (deathCross) { confidence = 90; reasons.push("EMA death cross"); }
     if (volSpike) { confidence = Math.min(confidence + 5, 95); reasons.push("Volume spike"); }
-  }
-  // Weak BUY
-  else if (lastRSI < 40 && emaCross && macdRising) {
+  } else if (lastRSI < 40 && emaCross && macdRising) {
     signal = "BUY";
     confidence = 55;
     reasons = ["RSI low", "EMA bullish", "MACD rising"];
-  }
-  // Weak SELL
-  else if (lastRSI > 60 && !emaCross && !macdRising) {
+  } else if (lastRSI > 60 && !emaCross && !macdRising) {
     signal = "SELL";
     confidence = 55;
     reasons = ["RSI high", "EMA bearish", "MACD falling"];
@@ -154,7 +160,6 @@ export default function LiveChart({ onAiAlert }) {
   const chartRef = useRef(null);
   const candleSeriesRef = useRef(null);
   const volumeSeriesRef = useRef(null);
-  const markerSeriesRef = useRef(null);
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const candlesRef = useRef([]);
@@ -174,7 +179,6 @@ export default function LiveChart({ onAiAlert }) {
   const [showSettings, setShowSettings] = useState(false);
   const [minConfidence, setMinConfidence] = useState(60);
 
-  // Request notification permission
   const enableNotifications = async () => {
     if ("Notification" in window) {
       const perm = await Notification.requestPermission();
@@ -188,7 +192,6 @@ export default function LiveChart({ onAiAlert }) {
     }
   };
 
-  // Fetch initial historical candles
   const fetchHistory = useCallback(async (symbol, interval) => {
     setLoading(true);
     setError("");
@@ -226,7 +229,6 @@ export default function LiveChart({ onAiAlert }) {
         volumeSeriesRef.current.setData(volData);
       }
 
-      // Run AI analysis on historical data
       const signal = analyzeSignal(candles, volumes);
       if (signal && signal.confidence >= minConfidence) {
         setAiSignal(signal);
@@ -243,7 +245,6 @@ export default function LiveChart({ onAiAlert }) {
     setLoading(false);
   }, [minConfidence]);
 
-  // Initialize chart
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
@@ -310,12 +311,10 @@ export default function LiveChart({ onAiAlert }) {
     };
   }, []);
 
-  // Fetch history when pair/interval changes
   useEffect(() => {
     fetchHistory(selectedPair, selectedInterval);
   }, [selectedPair, selectedInterval, fetchHistory]);
 
-  // WebSocket connection
   useEffect(() => {
     if (wsRef.current) {
       wsRef.current.close();
@@ -356,7 +355,6 @@ export default function LiveChart({ onAiAlert }) {
         volumeSeriesRef.current.update(volume);
       }
 
-      // Update stored candles
       const existingIdx = candlesRef.current.findIndex((c) => c.time === candle.time);
       if (existingIdx >= 0) {
         candlesRef.current[existingIdx] = candle;
@@ -373,7 +371,6 @@ export default function LiveChart({ onAiAlert }) {
       setLastPrice(candle.close);
       setPriceChange(((candle.close - candle.open) / candle.open) * 100);
 
-      // AI Signal check — only every 10 ticks to avoid spam
       signalCooldownRef.current += 1;
       if (signalCooldownRef.current >= 10 && candlesRef.current.length >= 30) {
         signalCooldownRef.current = 0;
@@ -398,11 +395,10 @@ export default function LiveChart({ onAiAlert }) {
             }
 
             sendNotification(
-              `🚨 ${signal.signal} Signal: ${selectedPair}`,
-              `${signal.confidence}% confidence at $${signal.price.toLocaleString()} — ${signal.reasons.join(", ")}`
+              `${signal.signal} Signal: ${selectedPair}`,
+              `${signal.confidence}% confidence at $${formatPrice(signal.price)} — ${signal.reasons.join(", ")}`
             );
 
-            // Add marker on chart
             if (candleSeriesRef.current) {
               candleSeriesRef.current.setMarkers([
                 {
@@ -453,7 +449,6 @@ export default function LiveChart({ onAiAlert }) {
     <div>
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        {/* Pair selector */}
         <select
           value={selectedPair}
           onChange={(e) => setSelectedPair(e.target.value)}
@@ -466,7 +461,6 @@ export default function LiveChart({ onAiAlert }) {
           ))}
         </select>
 
-        {/* Interval selector */}
         <div className="flex gap-1">
           {INTERVALS.map((int) => (
             <button
@@ -483,7 +477,6 @@ export default function LiveChart({ onAiAlert }) {
           ))}
         </div>
 
-        {/* Connection status */}
         <div className="flex items-center gap-1.5 ml-auto">
           {connected ? (
             <>
@@ -498,7 +491,6 @@ export default function LiveChart({ onAiAlert }) {
           )}
         </div>
 
-        {/* Notification toggle */}
         <button
           onClick={notificationsEnabled ? () => setNotificationsEnabled(false) : enableNotifications}
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs border transition-colors ${
@@ -512,7 +504,6 @@ export default function LiveChart({ onAiAlert }) {
           {notificationsEnabled ? "ON" : "OFF"}
         </button>
 
-        {/* Settings */}
         <button
           onClick={() => setShowSettings(!showSettings)}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-bg-card border border-bg-border text-slate-400 hover:text-white transition-colors"
@@ -564,7 +555,7 @@ export default function LiveChart({ onAiAlert }) {
               AI {aiSignal.signal} Signal — {selectedPair}
             </p>
             <p className={`text-xs font-mono ${aiSignal.signal === "BUY" ? "text-brand-green" : "text-brand-red"}`}>
-              {aiSignal.confidence}% confidence at ${aiSignal.price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {aiSignal.confidence}% confidence at ${formatPrice(aiSignal.price)}
             </p>
             <p className="text-xs text-slate-300 mt-0.5">
               {aiSignal.reasons?.join(" · ")}
@@ -584,7 +575,7 @@ export default function LiveChart({ onAiAlert }) {
       {lastPrice !== null && (
         <div className="flex items-center gap-3 mb-4">
           <span className="text-2xl font-mono font-semibold text-white">
-            ${lastPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ${formatPrice(lastPrice)}
           </span>
           <span
             className={`flex items-center gap-1 text-sm font-mono font-medium ${
@@ -611,7 +602,6 @@ export default function LiveChart({ onAiAlert }) {
         </div>
       )}
 
-      {/* Chart container */}
       <div
         ref={chartContainerRef}
         className="bg-bg-card border border-bg-border rounded-xl overflow-hidden"

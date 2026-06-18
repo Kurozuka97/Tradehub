@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { TrendingUp, TrendingDown, Minus, RefreshCw, Bell, BrainCircuit } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, RefreshCw, BrainCircuit } from "lucide-react";
 
 const CryptoSparkline = dynamic(() => import("./CryptoSparkline"), { ssr: false });
 
@@ -27,13 +27,39 @@ const COINS = [
 
 const FOREX = ["MYR", "SGD", "EUR", "GBP", "JPY", "AUD", "CNY", "THB", "IDR", "KRW", "CAD", "CHF", "NZD", "HKD", "INR", "PHP"];
 
+function formatPrice(val) {
+  if (val == null || isNaN(val)) return "—";
+  try {
+    if (val >= 1000) {
+      return "$" + val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+    if (val >= 1) {
+      return "$" + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    if (val >= 0.01) {
+      return "$" + val.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+    }
+    return "$" + val.toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 6 });
+  } catch {
+    return "$" + val.toFixed(2);
+  }
+}
+
+function formatMyr(val) {
+  if (val == null || isNaN(val)) return "—";
+  try {
+    return "RM" + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  } catch {
+    return "RM" + val.toFixed(2);
+  }
+}
+
 export default function Dashboard({ refreshKey, onLastUpdated, aiAlerts }) {
   const [prices, setPrices] = useState({});
   const [forex, setForex] = useState({});
   const [forexHistory, setForexHistory] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [lastUpdated, setLastUpdated] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -53,7 +79,6 @@ export default function Dashboard({ refreshKey, onLastUpdated, aiAlerts }) {
       const forexHist = await forexRes.json();
       setForexHistory(forexHist.history || {});
       const now = new Date();
-      setLastUpdated(now);
       if (onLastUpdated) onLastUpdated(now);
     } catch {
       setError("Failed to fetch live data. Retrying in 60s...");
@@ -88,7 +113,7 @@ export default function Dashboard({ refreshKey, onLastUpdated, aiAlerts }) {
       )}
 
       {/* AI Signals Panel */}
-      {aiAlerts.length > 0 && (
+      {aiAlerts && aiAlerts.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-3">
             <BrainCircuit size={14} className="text-brand-purple" />
@@ -134,7 +159,7 @@ export default function Dashboard({ refreshKey, onLastUpdated, aiAlerts }) {
           const chg = d?.usd_24h_change;
           const isUp = chg > 0;
           const isDown = chg < 0;
-          const spark = d?.usd_24h_change ? d.sparkline_in_7d?.price : null;
+          const spark = d?.sparkline_in_7d?.price;
 
           return (
             <div
@@ -155,7 +180,7 @@ export default function Dashboard({ refreshKey, onLastUpdated, aiAlerts }) {
                 )}
               </div>
               <p className="text-lg font-mono font-semibold text-white mb-1">
-                ${d?.usd ? d.usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: d.usd >= 1000 ? 0 : 2 }) : "—"}
+                {formatPrice(d?.usd)}
               </p>
               <div className="flex items-center justify-between">
                 <p className={`text-xs font-mono ${isUp ? "text-brand-green" : isDown ? "text-brand-red" : "text-slate-300"}`}>
@@ -163,10 +188,10 @@ export default function Dashboard({ refreshKey, onLastUpdated, aiAlerts }) {
                   {chg?.toFixed(2) ?? "0.00"}%
                 </p>
                 <p className="text-xs text-slate-300 font-mono">
-                  RM{d?.myr ? d.myr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}
+                  {formatMyr(d?.myr)}
                 </p>
               </div>
-              {spark && (
+              {spark && spark.length > 0 && (
                 <div className="mt-2">
                   <CryptoSparkline data={spark} />
                 </div>

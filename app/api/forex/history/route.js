@@ -3,9 +3,8 @@ export const dynamic = 'force-dynamic';
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const symbolsParam = searchParams.get('symbols');
-  const symbols = symbolsParam ? symbolsParam.split(',') : ['MYR','SGD','EUR','GBP','JPY','AUD','CNY'];
+  const symbols = symbolsParam ? symbolsParam.split(',') : ['MYR','SGD','EUR','GBP','JPY','AUD','CNY','THB','IDR','KRW','CAD','CHF','NZD','HKD','INR','PHP'];
 
-  // Last 30 days range
   const end = new Date();
   const start = new Date();
   start.setDate(end.getDate() - 30);
@@ -23,7 +22,6 @@ export async function GET(request) {
       return Response.json({ error: 'upstream_error' }, { status: res.status });
     }
     const data = await res.json();
-    // Flatten per symbol
     const history = {};
     symbols.forEach((sym) => (history[sym] = []));
     for (const [date, rates] of Object.entries(data.rates || {})) {
@@ -33,7 +31,6 @@ export async function GET(request) {
         }
       });
     }
-    // Ensure sorted by date
     symbols.forEach((sym) => {
       history[sym].sort((a, b) => a.date.localeCompare(b.date));
     });

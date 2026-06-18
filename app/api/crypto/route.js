@@ -1,4 +1,4 @@
-const COIN_IDS = "bitcoin,ethereum,solana,binancecoin,ripple,cardano,polkadot,avalanche-2";
+const COIN_IDS = "bitcoin,ethereum,solana,binancecoin,ripple,cardano,polkadot,avalanche-2,chainlink,polygon,litecoin,uniswap,stellar,filecoin,tron,monero";
 const URL = `https://api.coingecko.com/api/v3/simple/price?ids=${COIN_IDS}&vs_currencies=usd,myr&include_24hr_change=true&include_market_cap=true&include_sparkline=true`;
 
 export async function GET() {

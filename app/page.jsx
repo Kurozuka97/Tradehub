@@ -2,25 +2,23 @@
 
 import { useState } from "react";
 
-
 import Dashboard from "@/components/Dashboard";
 import TAChart from "@/components/TAChart";
-
 import BuySell from "@/components/Journal";
-import Guide from "@/components/Guide";
+import LiveChart from "@/components/LiveChart";
 import {
   LayoutDashboard,
   LineChart,
   BookOpen,
-  GraduationCap,
+  Zap,
   RefreshCw,
 } from "lucide-react";
 
 const TABS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { key: "live", label: "Live", icon: Zap },
   { key: "ta", label: "TA Chart", icon: LineChart },
   { key: "buysell", label: "Buy/Sell", icon: BookOpen },
-  { key: "guide", label: "Guide", icon: GraduationCap },
 ];
 
 export default function Home() {
@@ -40,24 +38,23 @@ export default function Home() {
           </div>
           <div>
             <h1 className="text-base font-semibold text-white leading-none">TradeHub</h1>
-            <p className="text-xs text-slate-300 mt-0.5">Crypto · Forex · TA · Buy/Sell</p>
+            <p className="text-xs text-slate-300 mt-0.5">Crypto · Forex · TA · Buy/Sell · Live</p>
           </div>
-</div>
-<div className="flex items-center gap-2">
-
-  <button
-    onClick={handleRefresh}
-    className="flex items-center gap-2 text-xs text-slate-400 hover:text-white bg-bg-card border border-bg-border px-3 py-1.5 rounded-lg transition-colors"
-  >
-    <RefreshCw size={13} />
-    Refresh
-    </button>
-    {lastUpdated && (
-      <span className="text-xs text-slate-300 ml-2">
-        Last updated: {lastUpdated.toLocaleTimeString()}
-      </span>
-    )}
-  </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            className="flex items-center gap-2 text-xs text-slate-400 hover:text-white bg-bg-card border border-bg-border px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <RefreshCw size={13} />
+            Refresh
+          </button>
+          {lastUpdated && (
+            <span className="text-xs text-slate-300 ml-2">
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
+        </div>
       </header>
 
       {/* Tab Nav */}
@@ -81,9 +78,9 @@ export default function Home() {
       {/* Content */}
       <main className="px-6 py-6 max-w-5xl mx-auto">
         {tab === "dashboard" && <Dashboard refreshKey={refreshKey} onLastUpdated={setLastUpdated} />}
+        {tab === "live" && <LiveChart />}
         {tab === "ta" && <TAChart refreshKey={refreshKey} />}
         {tab === "buysell" && <BuySell />}
-        {tab === "guide" && <Guide />}
       </main>
     </div>
   );

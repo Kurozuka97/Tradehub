@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { createChart, ColorType, CrosshairMode } from "lightweight-charts";
 import {
   Zap, ZapOff, TrendingUp, TrendingDown, Minus,
-  BrainCircuit, Bell, BellOff, Settings
+  BrainCircuit, Bell, BellOff, Settings, WifiOff, RotateCcw
 } from "lucide-react";
 
 const PAIRS = [
@@ -35,6 +35,12 @@ const INTERVALS = [
   { key: "1d", label: "1D" },
 ];
 
+const MAX_RECONNECT_DELAY = 30000; // 30s cap
+const HEARTBEAT_INTERVAL = 20000;   // ping every 20s
+const PONG_TIMEOUT = 10000;         // wait 10s for response
+const SIGNAL_COOLDOWN_TICKS = 10;   // check AI every 10 ticks
+const CANDLE_LIMIT = 200;
+
 function formatPrice(val) {
   if (val == null || isNaN(val)) return "—";
   try {
@@ -53,7 +59,7 @@ function formatPrice(val) {
   }
 }
 
-// AI Signal Engine
+// ─── AI Signal Engine ───────────────────────────────────────────
 function analyzeSignal(candles, volumes) {
   if (candles.length < 30) return null;
 
@@ -155,6 +161,7 @@ function computeMACD(arr, fast = 12, slow = 26, signal = 9) {
   return { macd, signal: signalLine, hist };
 }
 
+// ─── Main Component ─────────────────────────────────────────────
 export default function LiveChart({ onAiAlert }) {
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
@@ -162,10 +169,15 @@ export default function LiveChart({ onAiAlert }) {
   const volumeSeriesRef = useRef(null);
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
+  const pingIntervalRef = useRef(null);
+  const pongTimeoutRef = useRef(null);
   const candlesRef = useRef([]);
   const volumesRef = useRef([]);
   const lastSignalRef = useRef(null);
   const signalCooldownRef = useRef(0);
+  const reconnectAttemptsRef = useRef(0);
+  const isIntentionalCloseRef = useRef(false);
+  const pairSwitchDebounceRef = useRef(null);
 
   const [selectedPair, setSelectedPair] = useState("BTCUSDT");
   const [selectedInterval, setSelectedInterval] = useState("1m");
@@ -174,32 +186,52 @@ export default function LiveChart({ onAiAlert }) {
   const [priceChange, setPriceChange] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [reconnectStatus, setReconnectStatus] = useState("");
   const [aiSignal, setAiSignal] = useState(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [minConfidence, setMinConfidence] = useState(60);
 
+  // ─── Notifications ──────────────────────────────────────────
   const enableNotifications = async () => {
-    if ("Notification" in window) {
+    if (!("Notification" in window)) {
+      setError("Browser notifications not supported");
+      return;
+    }
+    try {
       const perm = await Notification.requestPermission();
       setNotificationsEnabled(perm === "granted");
+      if (perm !== "granted") {
+        setError("Notification permission denied");
+      }
+    } catch {
+      setError("Failed to request notification permission");
     }
   };
 
-  const sendNotification = (title, body) => {
+  const sendNotification = useCallback((title, body) => {
     if (notificationsEnabled && "Notification" in window && Notification.permission === "granted") {
-      new Notification(title, { body, icon: "🔔" });
+      try {
+        new Notification(title, { body, icon: "🔔" });
+      } catch {
+        // Silent fail
+      }
     }
-  };
+  }, [notificationsEnabled]);
 
+  // ─── Fetch History ────────────────────────────────────────
   const fetchHistory = useCallback(async (symbol, interval) => {
     setLoading(true);
     setError("");
+    setReconnectStatus("");
     setAiSignal(null);
     lastSignalRef.current = null;
+    signalCooldownRef.current = 0;
+
     try {
       const res = await fetch(
-        `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=200`
+        `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${CANDLE_LIMIT}`,
+        { signal: AbortSignal.timeout(15000) }
       );
       if (!res.ok) throw new Error("fetch_failed");
       const data = await res.json();
@@ -224,6 +256,7 @@ export default function LiveChart({ onAiAlert }) {
 
       if (candleSeriesRef.current) {
         candleSeriesRef.current.setData(candles);
+        candleSeriesRef.current.setMarkers([]); // clear old markers
       }
       if (volumeSeriesRef.current) {
         volumeSeriesRef.current.setData(volData);
@@ -240,11 +273,16 @@ export default function LiveChart({ onAiAlert }) {
         setPriceChange(((lastCandle.close - lastCandle.open) / lastCandle.open) * 100);
       }
     } catch (err) {
-      setError("Failed to load chart data. Retrying...");
+      if (err.name === "AbortError") {
+        setError("Chart data timeout. Retrying...");
+      } else {
+        setError("Failed to load chart data. Retrying...");
+      }
     }
     setLoading(false);
   }, [minConfidence]);
 
+  // ─── Initialize Chart ─────────────────────────────────────
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
@@ -311,130 +349,238 @@ export default function LiveChart({ onAiAlert }) {
     };
   }, []);
 
+  // ─── Fetch on pair/interval change ────────────────────────
   useEffect(() => {
     fetchHistory(selectedPair, selectedInterval);
   }, [selectedPair, selectedInterval, fetchHistory]);
 
+  // ─── WebSocket with Heartbeat & Exponential Backoff ───────
   useEffect(() => {
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-    if (reconnectTimeoutRef.current) {
+    let ws = null;
+    let pingTimer = null;
+    let pongTimer = null;
+
+    const cleanup = () => {
+      clearInterval(pingTimer);
+      clearTimeout(pongTimer);
       clearTimeout(reconnectTimeoutRef.current);
-    }
-
-    const stream = `${selectedPair.toLowerCase()}@kline_${selectedInterval}`;
-    const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${stream}`);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      setConnected(true);
-      setError("");
+      if (ws) {
+        isIntentionalCloseRef.current = true;
+        try { ws.close(); } catch { /* ignore */ }
+      }
     };
 
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      const k = data.k;
-      const candle = {
-        time: k.t / 1000,
-        open: parseFloat(k.o),
-        high: parseFloat(k.h),
-        low: parseFloat(k.l),
-        close: parseFloat(k.c),
-      };
-      const volume = {
-        time: k.t / 1000,
-        value: parseFloat(k.v),
-        color: parseFloat(k.c) >= parseFloat(k.o) ? "#00d4aa40" : "#ff4d6a40",
+    const connect = () => {
+      cleanup();
+      isIntentionalCloseRef.current = false;
+
+      const stream = `${selectedPair.toLowerCase()}@kline_${selectedInterval}`;
+      ws = new WebSocket(`wss://stream.binance.com:9443/ws/${stream}`);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        setConnected(true);
+        setError("");
+        setReconnectStatus("");
+        reconnectAttemptsRef.current = 0;
+
+        // Heartbeat: send ping every 20s
+        pingTimer = setInterval(() => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            // Binance uses LIST_SUBSCRIPTIONS as a keep-alive
+            ws.send(JSON.stringify({ method: "LIST_SUBSCRIPTIONS", id: Date.now() }));
+
+            // If no response in 10s, force reconnect
+            pongTimer = setTimeout(() => {
+              if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+              }
+            }, PONG_TIMEOUT);
+          }
+        }, HEARTBEAT_INTERVAL);
       };
 
-      if (candleSeriesRef.current) {
-        candleSeriesRef.current.update(candle);
-      }
-      if (volumeSeriesRef.current) {
-        volumeSeriesRef.current.update(volume);
-      }
+      ws.onmessage = (event) => {
+        // Clear pong timeout on any message
+        clearTimeout(pongTimer);
+        pongTimer = null;
 
-      const existingIdx = candlesRef.current.findIndex((c) => c.time === candle.time);
-      if (existingIdx >= 0) {
-        candlesRef.current[existingIdx] = candle;
-        volumesRef.current[existingIdx] = parseFloat(k.v);
-      } else {
-        candlesRef.current.push(candle);
-        volumesRef.current.push(parseFloat(k.v));
-        if (candlesRef.current.length > 200) {
-          candlesRef.current.shift();
-          volumesRef.current.shift();
+        let data;
+        try {
+          data = JSON.parse(event.data);
+        } catch {
+          return;
         }
-      }
 
-      setLastPrice(candle.close);
-      setPriceChange(((candle.close - candle.open) / candle.open) * 100);
+        // Skip heartbeat responses
+        if (data.id !== undefined && !data.k) return;
+        if (!data.k) return;
 
-      signalCooldownRef.current += 1;
-      if (signalCooldownRef.current >= 10 && candlesRef.current.length >= 30) {
-        signalCooldownRef.current = 0;
-        const signal = analyzeSignal(candlesRef.current, volumesRef.current);
-        if (signal && signal.confidence >= minConfidence) {
-          const signalKey = `${selectedPair}-${signal.signal}`;
-          if (lastSignalRef.current !== signalKey) {
-            lastSignalRef.current = signalKey;
-            setAiSignal(signal);
+        const k = data.k;
+        const candle = {
+          time: k.t / 1000,
+          open: parseFloat(k.o),
+          high: parseFloat(k.h),
+          low: parseFloat(k.l),
+          close: parseFloat(k.c),
+        };
+        const volume = {
+          time: k.t / 1000,
+          value: parseFloat(k.v),
+          color: parseFloat(k.c) >= parseFloat(k.o) ? "#00d4aa40" : "#ff4d6a40",
+        };
 
-            const alertData = {
-              pair: selectedPair,
-              signal: signal.signal,
-              confidence: signal.confidence,
-              price: signal.price,
-              time: new Date().toLocaleTimeString(),
-              reasons: signal.reasons,
-            };
+        if (candleSeriesRef.current) {
+          candleSeriesRef.current.update(candle);
+        }
+        if (volumeSeriesRef.current) {
+          volumeSeriesRef.current.update(volume);
+        }
 
-            if (onAiAlert) {
-              onAiAlert(alertData);
-            }
+        // Update stored candles
+        const existingIdx = candlesRef.current.findIndex((c) => c.time === candle.time);
+        if (existingIdx >= 0) {
+          candlesRef.current[existingIdx] = candle;
+          volumesRef.current[existingIdx] = parseFloat(k.v);
+        } else {
+          candlesRef.current.push(candle);
+          volumesRef.current.push(parseFloat(k.v));
+          if (candlesRef.current.length > CANDLE_LIMIT) {
+            candlesRef.current.shift();
+            volumesRef.current.shift();
+          }
+        }
 
-            sendNotification(
-              `${signal.signal} Signal: ${selectedPair}`,
-              `${signal.confidence}% confidence at $${formatPrice(signal.price)} — ${signal.reasons.join(", ")}`
-            );
+        setLastPrice(candle.close);
+        setPriceChange(((candle.close - candle.open) / candle.open) * 100);
 
-            if (candleSeriesRef.current) {
-              candleSeriesRef.current.setMarkers([
-                {
-                  time: candle.time,
-                  position: signal.signal === "BUY" ? "belowBar" : "aboveBar",
-                  color: signal.signal === "BUY" ? "#00d4aa" : "#ff4d6a",
-                  shape: signal.signal === "BUY" ? "arrowUp" : "arrowDown",
-                  text: `${signal.signal} ${signal.confidence}%`,
-                  size: 2,
-                },
-              ]);
+        // AI Signal check
+        signalCooldownRef.current += 1;
+        if (signalCooldownRef.current >= SIGNAL_COOLDOWN_TICKS && candlesRef.current.length >= 30) {
+          signalCooldownRef.current = 0;
+          const signal = analyzeSignal(candlesRef.current, volumesRef.current);
+          if (signal && signal.confidence >= minConfidence) {
+            const signalKey = `${selectedPair}-${signal.signal}`;
+            if (lastSignalRef.current !== signalKey) {
+              lastSignalRef.current = signalKey;
+              setAiSignal(signal);
+
+              const alertData = {
+                pair: selectedPair,
+                signal: signal.signal,
+                confidence: signal.confidence,
+                price: signal.price,
+                time: new Date().toLocaleTimeString(),
+                reasons: signal.reasons,
+              };
+
+              if (onAiAlert) {
+                onAiAlert(alertData);
+              }
+
+              sendNotification(
+                `${signal.signal} Signal: ${selectedPair}`,
+                `${signal.confidence}% confidence at $${formatPrice(signal.price)} — ${signal.reasons.join(", ")}`
+              );
+
+              if (candleSeriesRef.current) {
+                candleSeriesRef.current.setMarkers([
+                  {
+                    time: candle.time,
+                    position: signal.signal === "BUY" ? "belowBar" : "aboveBar",
+                    color: signal.signal === "BUY" ? "#00d4aa" : "#ff4d6a",
+                    shape: signal.signal === "BUY" ? "arrowUp" : "arrowDown",
+                    text: `${signal.signal} ${signal.confidence}%`,
+                    size: 2,
+                  },
+                ]);
+              }
             }
           }
         }
+      };
+
+      ws.onclose = (e) => {
+        setConnected(false);
+        clearInterval(pingTimer);
+        clearTimeout(pongTimer);
+
+        if (!isIntentionalCloseRef.current) {
+          const delay = Math.min(
+            1000 * Math.pow(2, reconnectAttemptsRef.current),
+            MAX_RECONNECT_DELAY
+          );
+          reconnectAttemptsRef.current += 1;
+
+          setReconnectStatus(`Reconnecting in ${(delay / 1000).toFixed(0)}s (#${reconnectAttemptsRef.current})`);
+
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connect();
+          }, delay);
+        }
+      };
+
+      ws.onerror = () => {
+        // Let onclose handle reconnect — don't duplicate
+        setConnected(false);
+      };
+    };
+
+    connect();
+
+    // Page visibility — reconnect when tab becomes active
+    const handleVisibility = () => {
+      if (!document.hidden && ws && ws.readyState !== WebSocket.OPEN) {
+        reconnectAttemptsRef.current = 0;
+        connect();
       }
     };
+    document.addEventListener("visibilitychange", handleVisibility);
 
-    ws.onclose = () => {
-      setConnected(false);
-      reconnectTimeoutRef.current = setTimeout(() => {
-        setSelectedPair((p) => p);
-      }, 3000);
+    // Network status — reconnect when back online
+    const handleOnline = () => {
+      reconnectAttemptsRef.current = 0;
+      connect();
     };
-
-    ws.onerror = () => {
-      setConnected(false);
-      setError("WebSocket error. Reconnecting...");
-    };
+    window.addEventListener("online", handleOnline);
 
     return () => {
-      ws.close();
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("online", handleOnline);
+      cleanup();
     };
-  }, [selectedPair, selectedInterval, minConfidence, onAiAlert, notificationsEnabled]);
+  }, [selectedPair, selectedInterval, minConfidence, onAiAlert, sendNotification]);
+
+  // ─── Debounced pair switch ────────────────────────────────
+  const handlePairChange = (symbol) => {
+    if (pairSwitchDebounceRef.current) {
+      clearTimeout(pairSwitchDebounceRef.current);
+    }
+    pairSwitchDebounceRef.current = setTimeout(() => {
+      setSelectedPair(symbol);
+    }, 300);
+  };
+
+  const handleIntervalChange = (interval) => {
+    if (pairSwitchDebounceRef.current) {
+      clearTimeout(pairSwitchDebounceRef.current);
+    }
+    pairSwitchDebounceRef.current = setTimeout(() => {
+      setSelectedInterval(interval);
+    }, 300);
+  };
+
+  // ─── Manual reconnect ───────────────────────────────────
+  const manualReconnect = () => {
+    reconnectAttemptsRef.current = 0;
+    isIntentionalCloseRef.current = true;
+    if (wsRef.current) {
+      try { wsRef.current.close(); } catch { /* ignore */ }
+    }
+    setTimeout(() => {
+      setSelectedPair((p) => p); // trigger reconnect via useEffect
+    }, 100);
+  };
 
   const priceIcon =
     priceChange > 0 ? (
@@ -451,7 +597,7 @@ export default function LiveChart({ onAiAlert }) {
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <select
           value={selectedPair}
-          onChange={(e) => setSelectedPair(e.target.value)}
+          onChange={(e) => handlePairChange(e.target.value)}
           className="text-sm"
         >
           {PAIRS.map((p) => (
@@ -465,7 +611,7 @@ export default function LiveChart({ onAiAlert }) {
           {INTERVALS.map((int) => (
             <button
               key={int.key}
-              onClick={() => setSelectedInterval(int.key)}
+              onClick={() => handleIntervalChange(int.key)}
               className={`px-2.5 py-1 rounded-lg text-xs border transition-colors ${
                 selectedInterval === int.key
                   ? "bg-brand-green/10 border-brand-green/30 text-brand-green font-medium"
@@ -485,15 +631,27 @@ export default function LiveChart({ onAiAlert }) {
             </>
           ) : (
             <>
-              <ZapOff size={12} className="text-brand-red" />
+              <WifiOff size={12} className="text-brand-red" />
               <span className="text-xs text-brand-red font-medium">Offline</span>
             </>
           )}
         </div>
 
+        {/* Manual reconnect */}
+        {!connected && (
+          <button
+            onClick={manualReconnect}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs bg-brand-blue/10 border border-brand-blue/30 text-brand-blue hover:bg-brand-blue/20 transition-colors"
+            title="Force reconnect"
+          >
+            <RotateCcw size={11} />
+            Reconnect
+          </button>
+        )}
+
         <button
           onClick={notificationsEnabled ? () => setNotificationsEnabled(false) : enableNotifications}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs border transition-colors ${
+          className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs border transition-colors ${
             notificationsEnabled
               ? "bg-brand-green/10 border-brand-green/30 text-brand-green"
               : "bg-bg-card border-bg-border text-slate-400 hover:text-slate-200"
@@ -501,23 +659,29 @@ export default function LiveChart({ onAiAlert }) {
           title={notificationsEnabled ? "Notifications ON" : "Enable notifications"}
         >
           {notificationsEnabled ? <Bell size={12} /> : <BellOff size={12} />}
-          {notificationsEnabled ? "ON" : "OFF"}
         </button>
 
         <button
           onClick={() => setShowSettings(!showSettings)}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-bg-card border border-bg-border text-slate-400 hover:text-white transition-colors"
+          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs bg-bg-card border border-bg-border text-slate-400 hover:text-white transition-colors"
         >
           <Settings size={12} />
-          AI
         </button>
       </div>
+
+      {/* Reconnect status */}
+      {reconnectStatus && !connected && (
+        <div className="mb-3 px-3 py-2 bg-brand-amber/5 border border-brand-amber/20 rounded-lg text-brand-amber text-xs flex items-center gap-2">
+          <div className="w-3 h-3 border-2 border-brand-amber/30 border-t-brand-amber rounded-full animate-spin" />
+          {reconnectStatus}
+        </div>
+      )}
 
       {/* AI Settings Panel */}
       {showSettings && (
         <div className="bg-bg-card border border-bg-border rounded-xl p-4 mb-4">
           <p className="text-xs text-slate-300 uppercase tracking-widest font-medium mb-3">AI Signal Settings</p>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <div>
               <label className="block text-xs text-slate-300 mb-1">Min Confidence: {minConfidence}%</label>
               <input
@@ -531,7 +695,7 @@ export default function LiveChart({ onAiAlert }) {
               />
             </div>
             <div className="text-xs text-slate-300">
-              <p>Signals use: RSI, EMA cross, MACD, Volume, Support/Resistance</p>
+              <p>Signals: RSI, EMA cross, MACD, Volume, Support/Resistance</p>
               <p className="mt-1">Higher confidence = fewer but stronger signals</p>
             </div>
           </div>

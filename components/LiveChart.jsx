@@ -40,7 +40,6 @@ export default function LiveChart() {
   const chartRef = useRef(null);
   const candleSeriesRef = useRef(null);
   const volumeSeriesRef = useRef(null);
-  const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const candlesRef = useRef([]);
   const volumesRef = useRef([]);
@@ -269,7 +268,6 @@ export default function LiveChart() {
 
       const stream = `${selectedPair.toLowerCase()}@kline_${selectedInterval}`;
       ws = new WebSocket(`wss://stream.binance.com:9443/ws/${stream}`);
-      wsRef.current = ws;
 
       ws.onopen = () => {
         setConnected(true);

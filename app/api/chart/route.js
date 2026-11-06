@@ -1,15 +1,15 @@
+import { CHART_ALLOWED_COINS, CHART_ALLOWED_DAYS } from "@/lib/coins";
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const coin = searchParams.get("coin") || "bitcoin";
   const days = searchParams.get("days") || "30";
 
-  const allowed = ["bitcoin","ethereum","solana","binancecoin","ripple","cardano","polkadot","avalanche-2"];
-  if (!allowed.includes(coin)) {
+  if (!CHART_ALLOWED_COINS.includes(coin)) {
     return Response.json({ error: "invalid_coin" }, { status: 400 });
   }
 
-  const validDays = ["1","7","14","30","90"];
-  if (!validDays.includes(days)) {
+  if (!CHART_ALLOWED_DAYS.includes(days)) {
     return Response.json({ error: "invalid_days" }, { status: 400 });
   }
 

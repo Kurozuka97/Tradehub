@@ -3,58 +3,25 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { TrendingUp, TrendingDown, Minus, RefreshCw, BrainCircuit } from "lucide-react";
+import { COINS, FOREX } from "@/lib/coins";
+import { usd, formatMyr } from "@/lib/format";
+import {
+  getSignalStats,
+  clearSignals,
+  SIGNAL_TARGET_PCT,
+  SIGNAL_MAX_CANDLES,
+} from "@/lib/signalStore";
 
 const CryptoSparkline = dynamic(() => import("./CryptoSparkline"), { ssr: false });
 
-const COINS = [
-  { id: "bitcoin", sym: "BTC", name: "Bitcoin" },
-  { id: "ethereum", sym: "ETH", name: "Ethereum" },
-  { id: "solana", sym: "SOL", name: "Solana" },
-  { id: "binancecoin", sym: "BNB", name: "BNB" },
-  { id: "ripple", sym: "XRP", name: "XRP" },
-  { id: "cardano", sym: "ADA", name: "Cardano" },
-  { id: "polkadot", sym: "DOT", name: "Polkadot" },
-  { id: "avalanche-2", sym: "AVAX", name: "Avalanche" },
-  { id: "chainlink", sym: "LINK", name: "Chainlink" },
-  { id: "polygon", sym: "MATIC", name: "Polygon" },
-  { id: "litecoin", sym: "LTC", name: "Litecoin" },
-  { id: "uniswap", sym: "UNI", name: "Uniswap" },
-  { id: "stellar", sym: "XLM", name: "Stellar" },
-  { id: "filecoin", sym: "FIL", name: "Filecoin" },
-  { id: "tron", sym: "TRX", name: "TRON" },
-  { id: "monero", sym: "XMR", name: "Monero" },
-];
+const STATUS_META = {
+  open: { label: "OPEN", className: "bg-brand-amber/10 text-brand-amber border-brand-amber/30" },
+  win: { label: "WIN", className: "bg-brand-green/10 text-brand-green border-brand-green/30" },
+  loss: { label: "LOSS", className: "bg-brand-red/10 text-brand-red border-brand-red/30" },
+  expired: { label: "EXPIRED", className: "bg-bg-surface text-slate-300 border-bg-border" },
+};
 
-const FOREX = ["MYR", "SGD", "EUR", "GBP", "JPY", "AUD", "CNY", "THB", "IDR", "KRW", "CAD", "CHF", "NZD", "HKD", "INR", "PHP"];
-
-function formatPrice(val) {
-  if (val == null || isNaN(val)) return "—";
-  try {
-    if (val >= 1000) {
-      return "$" + val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-    }
-    if (val >= 1) {
-      return "$" + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-    if (val >= 0.01) {
-      return "$" + val.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
-    }
-    return "$" + val.toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 6 });
-  } catch {
-    return "$" + val.toFixed(2);
-  }
-}
-
-function formatMyr(val) {
-  if (val == null || isNaN(val)) return "—";
-  try {
-    return "RM" + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  } catch {
-    return "RM" + val.toFixed(2);
-  }
-}
-
-export default function Dashboard({ refreshKey, onLastUpdated, aiAlerts }) {
+export default function Dashboard({ refreshKey, onLastUpdated, signals = [] }) {
   const [prices, setPrices] = useState({});
   const [forex, setForex] = useState({});
   const [forexHistory, setForexHistory] = useState({});
@@ -104,6 +71,8 @@ export default function Dashboard({ refreshKey, onLastUpdated, aiAlerts }) {
     );
   }
 
+  const stats = getSignalStats(signals);
+
   return (
     <div>
       {error && (
@@ -113,38 +82,99 @@ export default function Dashboard({ refreshKey, onLastUpdated, aiAlerts }) {
       )}
 
       {/* AI Signals Panel */}
-      {aiAlerts && aiAlerts.length > 0 && (
+      {signals.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-3">
             <BrainCircuit size={14} className="text-brand-purple" />
             <p className="text-xs text-brand-purple uppercase tracking-widest font-medium">AI Signals</p>
+            <span className="text-xs text-slate-400">
+              rule-based confluence · resolved at ±{SIGNAL_TARGET_PCT}% / {SIGNAL_MAX_CANDLES} candles
+            </span>
+            <button
+              onClick={() => {
+                if (window.confirm("Clear the entire signal log?")) clearSignals();
+              }}
+              className="ml-auto text-[11px] text-slate-400 hover:text-brand-red border border-bg-border hover:border-brand-red/40 bg-bg-card px-2 py-1 rounded-lg transition-colors"
+            >
+              Clear log
+            </button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {aiAlerts.slice(0, 6).map((alert, idx) => (
-              <div
-                key={`${alert.pair}-${alert.signal}-${idx}`}
-                className={`bg-bg-card border rounded-xl p-3 flex items-center gap-3 ${
-                  alert.signal === "BUY" ? "border-brand-green/40" : "border-brand-red/40"
-                }`}
-              >
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                  alert.signal === "BUY" ? "bg-brand-green/10" : "bg-brand-red/10"
-                }`}>
-                  {alert.signal === "BUY" ? (
-                    <TrendingUp size={14} className="text-brand-green" />
-                  ) : (
-                    <TrendingDown size={14} className="text-brand-red" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{alert.pair}</p>
-                  <p className={`text-xs font-mono ${alert.signal === "BUY" ? "text-brand-green" : "text-brand-red"}`}>
-                    {alert.signal} — {alert.confidence}% confidence
-                  </p>
-                </div>
-                <span className="text-xs text-slate-300">{alert.time}</span>
+
+          {/* Performance strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+            {[
+              { label: "Signals", value: String(stats.total), color: "text-white" },
+              {
+                label: "Hit Rate",
+                value: stats.hitRate == null ? "—" : `${stats.hitRate}%`,
+                color:
+                  stats.hitRate == null
+                    ? "text-slate-300"
+                    : stats.hitRate >= 50
+                    ? "text-brand-green"
+                    : "text-brand-red",
+              },
+              { label: "Wins", value: String(stats.wins), color: "text-brand-green" },
+              { label: "Losses", value: String(stats.losses), color: "text-brand-red" },
+              { label: "Open", value: String(stats.open), color: "text-brand-amber" },
+              { label: "Expired", value: String(stats.expired), color: "text-slate-300" },
+            ].map((m) => (
+              <div key={m.label} className="bg-bg-card border border-bg-border rounded-xl p-3">
+                <p className="text-[11px] text-slate-300 mb-1">{m.label}</p>
+                <p className={`font-mono text-lg font-medium ${m.color}`}>{m.value}</p>
               </div>
             ))}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {signals.slice(0, 6).map((alert) => {
+              const status = STATUS_META[alert.status] || STATUS_META.open;
+              const isBuy = alert.signal === "BUY";
+              return (
+                <div
+                  key={alert.id || `${alert.pair}-${alert.signal}-${alert.timestamp}`}
+                  className={`bg-bg-card border rounded-xl p-3 ${
+                    isBuy ? "border-brand-green/40" : "border-brand-red/40"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        isBuy ? "bg-brand-green/10" : "bg-brand-red/10"
+                      }`}
+                    >
+                      {isBuy ? (
+                        <TrendingUp size={14} className="text-brand-green" />
+                      ) : (
+                        <TrendingDown size={14} className="text-brand-red" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{alert.pair}</p>
+                      <p
+                        className={`text-xs font-mono ${isBuy ? "text-brand-green" : "text-brand-red"}`}
+                      >
+                        {alert.signal} — {alert.confidence}% @ {usd(alert.price)}
+                      </p>
+                    </div>
+                    <span
+                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${status.className}`}
+                    >
+                      {status.label}
+                    </span>
+                  </div>
+                  {alert.reasons?.length > 0 && (
+                    <p className="text-xs text-slate-400 mt-2 truncate">
+                      {alert.reasons.slice(0, 3).join(" · ")}
+                    </p>
+                  )}
+                  <p className="text-[11px] text-slate-400 mt-1.5">
+                    {alert.time}
+                    {alert.interval ? ` · ${alert.interval}` : ""}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -180,7 +210,7 @@ export default function Dashboard({ refreshKey, onLastUpdated, aiAlerts }) {
                 )}
               </div>
               <p className="text-lg font-mono font-semibold text-white mb-1">
-                {formatPrice(d?.usd)}
+                {usd(d?.usd)}
               </p>
               <div className="flex items-center justify-between">
                 <p className={`text-xs font-mono ${isUp ? "text-brand-green" : isDown ? "text-brand-red" : "text-slate-300"}`}>
@@ -202,15 +232,26 @@ export default function Dashboard({ refreshKey, onLastUpdated, aiAlerts }) {
       </div>
 
       {/* Forex */}
-      <h2 className="text-xs font-medium text-slate-300 uppercase tracking-widest mb-3">
-        Forex (USD Base)
-      </h2>
+      <div className="flex items-baseline gap-2 mb-3">
+        <h2 className="text-xs font-medium text-slate-300 uppercase tracking-widest">
+          Forex (USD Base)
+        </h2>
+        <span className="text-[11px] text-slate-400">change vs previous ECB close</span>
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
         {FOREX.map((sym) => {
-          const rate = forex[sym];
           const hist = forexHistory[sym] || [];
-          const prev = hist.length > 1 ? hist[hist.length - 2]?.rate : null;
-          const chg = prev && rate ? ((rate - prev) / prev) * 100 : 0;
+          const latest = hist.length ? hist[hist.length - 1] : null;
+          const prev = hist.length > 1 ? hist[hist.length - 2] : null;
+
+          // Rate and change must come from the same series — mixing /latest
+          // with history compared two different dates and skewed the %.
+          const rate = latest?.rate ?? forex[sym];
+          const chg =
+            latest && prev && prev.rate
+              ? ((latest.rate - prev.rate) / prev.rate) * 100
+              : 0;
+
           const isUp = chg > 0;
           const isDown = chg < 0;
 
@@ -232,7 +273,10 @@ export default function Dashboard({ refreshKey, onLastUpdated, aiAlerts }) {
               <p className="text-sm font-mono font-semibold text-white">
                 {rate ? rate.toFixed(4) : "—"}
               </p>
-              <p className={`text-xs font-mono ${isUp ? "text-brand-green" : isDown ? "text-brand-red" : "text-slate-300"}`}>
+              <p
+                className={`text-xs font-mono ${isUp ? "text-brand-green" : isDown ? "text-brand-red" : "text-slate-300"}`}
+                title={latest?.date ? `Close ${latest.date}` : undefined}
+              >
                 {isUp ? "+" : ""}
                 {chg.toFixed(2)}%
               </p>

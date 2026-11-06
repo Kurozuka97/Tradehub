@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Plus, Trash2, TrendingUp, TrendingDown, X } from "lucide-react";
+import { fmtMoney } from "@/lib/format";
 
 const STORAGE_KEY = "tradehub_journal";
 
@@ -125,10 +126,12 @@ export default function BuySell() {
       {/* Metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
-          { label: "Total P&L", value: `${totalPnL >= 0 ? "+" : ""}$${totalPnL.toFixed(2)}`, color: pnlColor(totalPnL) },
+          { label: "Total P&L", value: fmtMoney(totalPnL, { signed: true }), color: pnlColor(totalPnL) },
           { label: "Win Rate", value: `${wr}%`, color: wr >= 50 ? "text-brand-green" : "text-brand-red" },
-          { label: "Best Trade", value: `+$${best.toFixed(2)}`, color: "text-brand-green" },
-          { label: "Worst Trade", value: `$${worst.toFixed(2)}`, color: "text-brand-red" },
+          // fmtMoney is sign-aware — the old `+$${best}` rendered "+$-40.00"
+          // whenever every trade was a loss.
+          { label: "Best Trade", value: fmtMoney(best, { signed: true }), color: pnlColor(best) },
+          { label: "Worst Trade", value: fmtMoney(worst, { signed: true }), color: pnlColor(worst) },
         ].map((m) => (
           <div key={m.label} className="bg-bg-card border border-bg-border rounded-xl p-4 text-center">
             <p className="text-xs text-slate-300 mb-1">{m.label}</p>
@@ -270,7 +273,7 @@ export default function BuySell() {
                 </div>
                 <div className="flex items-center gap-4">
                   <span className={`font-mono text-sm font-medium ${pnlColor(p)}`}>
-                    {p >= 0 ? "+" : ""}${p.toFixed(2)}
+                    {fmtMoney(p, { signed: true })}
                   </span>
                   <button
                     onClick={() => del(t.id)}

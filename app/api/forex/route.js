@@ -1,4 +1,6 @@
-const URL = "https://api.frankfurter.app/latest?from=USD&to=MYR,SGD,EUR,GBP,JPY,AUD,CNY,THB,IDR,KRW,CAD,CHF,NZD,HKD,INR,PHP";
+import { FOREX } from "@/lib/coins";
+
+const URL = `https://api.frankfurter.app/latest?from=USD&to=${FOREX.join(",")}`;
 
 export async function GET() {
   try {

@@ -12,83 +12,34 @@ import {
   CartesianGrid,
 } from "recharts";
 import { RefreshCw } from "lucide-react";
+import { COINS, TA_DAYS } from "@/lib/coins";
+import {
+  computeMA,
+  computeBollinger,
+  computeEMA,
+  computeMACD,
+  computeRSI,
+} from "@/lib/indicators";
 
-const COINS = [
-  { id: "bitcoin", sym: "BTC" },
-  { id: "ethereum", sym: "ETH" },
-  { id: "solana", sym: "SOL" },
-  { id: "binancecoin", sym: "BNB" },
-  { id: "ripple", sym: "XRP" },
-];
-const DAYS = [1, 7, 14, 30, 90];
-
-function computeMA(arr, n) {
-  return arr.map((v, i) => {
-    if (i < n - 1) return null;
-    const s = arr.slice(i - n + 1, i + 1);
-    return +(s.reduce((a, b) => a + b, 0) / n).toFixed(4);
-  });
-}
-
-// Bollinger Bands
-function computeBollinger(arr, n = 20, k = 2) {
-  const upper = new Array(arr.length).fill(null);
-  const lower = new Array(arr.length).fill(null);
-  for (let i = n - 1; i < arr.length; i++) {
-    const slice = arr.slice(i - n + 1, i + 1);
-    const avg = slice.reduce((a, b) => a + b, 0) / n;
-    const variance = slice.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / n;
-    const std = Math.sqrt(variance);
-    upper[i] = +(avg + k * std).toFixed(4);
-    lower[i] = +(avg - k * std).toFixed(4);
-  }
-  return { upper, lower };
-}
-
-// Exponential Moving Average
-function computeEMA(arr, n) {
-  const k = 2 / (n + 1);
-  const ema = [];
-  arr.forEach((price, i) => {
-    if (i === 0) {
-      ema[i] = price;
-    } else {
-      ema[i] = price * k + ema[i - 1] * (1 - k);
-    }
-  });
-  return ema;
-}
-
-// MACD
-function computeMACD(arr, fast = 12, slow = 26, signal = 9) {
-  const emaFast = computeEMA(arr, fast);
-  const emaSlow = computeEMA(arr, slow);
-  const macd = emaFast.map((v, i) => v - emaSlow[i]);
-  const signalLine = computeEMA(macd, signal);
-  const hist = macd.map((v, i) => v - signalLine[i]);
-  return { macd, signal: signalLine, hist };
-}
-
-function computeRSI(arr, n = 14) {
-  const ch = arr.map((v, i) => (i === 0 ? 0 : v - arr[i - 1]));
-  return arr.map((_, i) => {
-    if (i < n) return null;
-    const sl = ch.slice(i - n + 1, i + 1);
-    const g = sl.filter((x) => x > 0).reduce((a, b) => a + b, 0) / n;
-    const l = sl.filter((x) => x < 0).reduce((a, b) => a + Math.abs(b), 0) / n;
-    if (l === 0) return 100;
-    return +(100 - 100 / (1 + g / l)).toFixed(2);
-  });
-}
+const DAYS = TA_DAYS;
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
+  const visible = payload.filter((p) => p.value != null);
+  if (!visible.length) return null;
+
+  const format = (p) => {
+    if (p.dataKey === "rsi") return p.value.toFixed(1);
+    if (p.dataKey === "macd" || p.dataKey === "macdSignal") return p.value.toFixed(4);
+    return `$${p.value.toLocaleString()}`;
+  };
+
   return (
     <div className="bg-bg-card border border-bg-border rounded-lg p-3 text-xs font-mono">
       <p className="text-slate-400 mb-1">{label}</p>
-      {payload.map((p) => (
+      {visible.map((p) => (
         <p key={p.dataKey} style={{ color: p.color }}>
-          {p.name}: {p.dataKey === "rsi" ? p.value?.toFixed(1) : `$${p.value?.toLocaleString()}`}
+          {p.name}: {format(p)}
         </p>
       ))}
     </div>
@@ -96,7 +47,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function TAChart({ refreshKey }) {
-  const [coin, setCoin] = useState("bitcoin");
+  const [coin, setCoin] = useState(COINS[0].id);
   const [days, setDays] = useState(30);
   const [chart, setChart] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -118,7 +69,6 @@ export default function TAChart({ refreshKey }) {
       const m7 = computeMA(prices, 7);
       const m25 = computeMA(prices, 25);
       const rsis = computeRSI(prices, 14);
-      // New indicators
       const bb = computeBollinger(prices);
       const ema9 = computeEMA(prices, 9);
       const macdData = computeMACD(prices);
@@ -148,8 +98,13 @@ export default function TAChart({ refreshKey }) {
   }, [refreshKey, coin, days]);
 
   const latestRsi = chart.filter((x) => x.rsi !== null).slice(-1)[0]?.rsi;
+
+  // Guard: before data arrives latestRsi is undefined/null, and `null <= 30`
+  // is true — without this the badge would claim "Oversold" with no data.
   const rsiSignal =
-    latestRsi >= 70
+    latestRsi == null
+      ? { label: "—", color: "#94a3b8", hint: "Awaiting data" }
+      : latestRsi >= 70
       ? { label: "Overbought", color: "#ff4d6a", hint: "Consider taking profit" }
       : latestRsi <= 30
       ? { label: "Oversold", color: "#00d4aa", hint: "Watch for long entry" }
@@ -166,6 +121,7 @@ export default function TAChart({ refreshKey }) {
           value={coin}
           onChange={(e) => setCoin(e.target.value)}
           className="text-sm"
+          aria-label="Select coin"
         >
           {COINS.map((c) => (
             <option key={c.id} value={c.id}>{c.sym}</option>
@@ -214,7 +170,7 @@ export default function TAChart({ refreshKey }) {
       {!loading && chart.length > 0 && (
         <div>
           {/* Legend */}
-          <div className="flex gap-4 mb-3 text-xs text-slate-300">
+          <div className="flex gap-4 mb-3 text-xs text-slate-300 flex-wrap">
             {[
               { color: "#4d9fff", label: "Price" },
               { color: "#f5a623", label: "MA7", dash: true },
@@ -224,6 +180,7 @@ export default function TAChart({ refreshKey }) {
               { color: "#9b87f5", label: "EMA9" },
               { color: "#ff7300", label: "MACD" },
               { color: "#387908", label: "Signal" },
+              { color: "#9b87f5", label: "RSI14" },
             ].map((l) => (
               <span key={l.label} className="flex items-center gap-1.5">
                 <span
@@ -239,9 +196,9 @@ export default function TAChart({ refreshKey }) {
             ))}
           </div>
 
-          {/* Price + MA */}
+          {/* Price + MA + BB */}
           <div className="bg-bg-card border border-bg-border rounded-xl p-4 mb-4">
-            <p className="text-xs text-slate-300 mb-3">Price + Moving Averages</p>
+            <p className="text-xs text-slate-300 mb-3">Price + Moving Averages + Bollinger</p>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={chart} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                 <CartesianGrid stroke={gridColor} vertical={false} />
@@ -256,7 +213,6 @@ export default function TAChart({ refreshKey }) {
                 <Line type="monotone" dataKey="price" stroke="#4d9fff" dot={false} strokeWidth={1.5} name="Price" />
                 <Line type="monotone" dataKey="ma7" stroke="#f5a623" dot={false} strokeWidth={1} strokeDasharray="4 4" name="MA7" />
                 <Line type="monotone" dataKey="ma25" stroke="#00d4aa" dot={false} strokeWidth={1} strokeDasharray="6 4" name="MA25" />
-                {/* New indicators */}
                 <Line type="monotone" dataKey="bbUpper" stroke="#ff4d6a" dot={false} strokeWidth={1} name="BB Upper" />
                 <Line type="monotone" dataKey="bbLower" stroke="#ff4d6a" dot={false} strokeWidth={1} strokeDasharray="2 2" name="BB Lower" />
                 <Line type="monotone" dataKey="ema9" stroke="#9b87f5" dot={false} strokeWidth={1} name="EMA9" />
@@ -264,9 +220,33 @@ export default function TAChart({ refreshKey }) {
             </ResponsiveContainer>
           </div>
 
-          {/* MACD */}
+          {/* RSI */}
           <div className="bg-bg-card border border-bg-border rounded-xl p-4 mb-4">
-            <p className="text-xs text-slate-300 mb-3">MACD</p>
+            <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+              <p className="text-xs text-slate-300">RSI (14)</p>
+              <p className="text-xs font-medium" style={{ color: rsiSignal.color }}>
+                {latestRsi != null && `RSI ${latestRsi.toFixed(1)} · `}
+                {rsiSignal.label}
+                <span className="text-slate-400 font-normal"> — {rsiSignal.hint}</span>
+              </p>
+            </div>
+            <ResponsiveContainer width="100%" height={110}>
+              <LineChart data={chart} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+                <CartesianGrid stroke={gridColor} vertical={false} />
+                <XAxis dataKey="d" tick={tickStyle} interval="preserveStartEnd" />
+                <YAxis tick={tickStyle} domain={[0, 100]} ticks={[0, 30, 50, 70, 100]} width={30} />
+                <Tooltip content={<CustomTooltip />} />
+                <ReferenceLine y={70} stroke="#ff4d6a" strokeDasharray="3 3" />
+                <ReferenceLine y={30} stroke="#00d4aa" strokeDasharray="3 3" />
+                <ReferenceLine y={50} stroke="#475569" strokeDasharray="2 4" />
+                <Line type="monotone" dataKey="rsi" stroke="#9b87f5" dot={false} strokeWidth={1.5} name="RSI" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* MACD */}
+          <div className="bg-bg-card border border-bg-border rounded-xl p-4">
+            <p className="text-xs text-slate-300 mb-3">MACD (12, 26, 9)</p>
             <ResponsiveContainer width="100%" height={120}>
               <LineChart data={chart} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                 <CartesianGrid stroke={gridColor} vertical={false} />

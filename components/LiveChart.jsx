@@ -3,28 +3,20 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createChart, ColorType, CrosshairMode } from "lightweight-charts";
 import {
-  Zap, ZapOff, TrendingUp, TrendingDown, Minus,
+  Zap, TrendingUp, TrendingDown, Minus,
   BrainCircuit, Bell, BellOff, Settings, WifiOff, RotateCcw
 } from "lucide-react";
+import { LIVE_PAIRS } from "@/lib/coins";
+import { formatPrice } from "@/lib/format";
+import { analyzeSignal } from "@/lib/signals";
+import {
+  addSignal,
+  loadSignals,
+  resolveSignals,
+  markersForRange,
+} from "@/lib/signalStore";
 
-const PAIRS = [
-  { symbol: "BTCUSDT", label: "BTC/USDT" },
-  { symbol: "ETHUSDT", label: "ETH/USDT" },
-  { symbol: "SOLUSDT", label: "SOL/USDT" },
-  { symbol: "BNBUSDT", label: "BNB/USDT" },
-  { symbol: "XRPUSDT", label: "XRP/USDT" },
-  { symbol: "ADAUSDT", label: "ADA/USDT" },
-  { symbol: "DOTUSDT", label: "DOT/USDT" },
-  { symbol: "AVAXUSDT", label: "AVAX/USDT" },
-  { symbol: "LINKUSDT", label: "LINK/USDT" },
-  { symbol: "MATICUSDT", label: "MATIC/USDT" },
-  { symbol: "LTCUSDT", label: "LTC/USDT" },
-  { symbol: "UNIUSDT", label: "UNI/USDT" },
-  { symbol: "XLMUSDT", label: "XLM/USDT" },
-  { symbol: "FILUSDT", label: "FIL/USDT" },
-  { symbol: "TRXUSDT", label: "TRX/USDT" },
-  { symbol: "XMRUSDT", label: "XMR/USDT" },
-];
+const PAIRS = LIVE_PAIRS;
 
 const INTERVALS = [
   { key: "1m", label: "1m" },
@@ -38,143 +30,23 @@ const INTERVALS = [
 const MAX_RECONNECT_DELAY = 30000; // 30s cap
 const HEARTBEAT_INTERVAL = 20000;   // ping every 20s
 const PONG_TIMEOUT = 10000;         // wait 10s for response
-const SIGNAL_COOLDOWN_TICKS = 10;   // check AI every 10 ticks
+const SIGNAL_COOLDOWN_TICKS = 10;   // evaluate AI every 10 ticks
+const SIGNAL_DEDUPE_MS = 30 * 60 * 1000; // one signal per pair+interval+direction / 30min
 const CANDLE_LIMIT = 200;
 
-function formatPrice(val) {
-  if (val == null || isNaN(val)) return "—";
-  try {
-    if (val >= 1000) {
-      return val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-    }
-    if (val >= 1) {
-      return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-    if (val >= 0.01) {
-      return val.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
-    }
-    return val.toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 6 });
-  } catch {
-    return val.toFixed(2);
-  }
-}
-
-// ─── AI Signal Engine ───────────────────────────────────────────
-function analyzeSignal(candles, volumes) {
-  if (candles.length < 30) return null;
-
-  const closes = candles.map((c) => c.close);
-  const highs = candles.map((c) => c.high);
-  const lows = candles.map((c) => c.low);
-
-  const rsi = computeRSI(closes, 14);
-  const lastRSI = rsi[rsi.length - 1];
-
-  const ema9 = computeEMA(closes, 9);
-  const ema21 = computeEMA(closes, 21);
-  const emaCross = ema9[ema9.length - 1] > ema21[ema21.length - 1];
-  const prevEmaCross = ema9[ema9.length - 2] > ema21[ema21.length - 2];
-  const goldenCross = emaCross && !prevEmaCross;
-  const deathCross = !emaCross && prevEmaCross;
-
-  const avgVol = volumes.slice(-20).reduce((a, b) => a + b, 0) / 20;
-  const lastVol = volumes[volumes.length - 1];
-  const volSpike = lastVol > avgVol * 1.5;
-
-  const recentLows = lows.slice(-20);
-  const recentHighs = highs.slice(-20);
-  const support = Math.min(...recentLows);
-  const resistance = Math.max(...recentHighs);
-  const lastClose = closes[closes.length - 1];
-  const nearSupport = lastClose < support * 1.02;
-  const nearResistance = lastClose > resistance * 0.98;
-
-  const macdData = computeMACD(closes);
-  const macdHist = macdData.hist;
-  const macdRising = macdHist[macdHist.length - 1] > macdHist[macdHist.length - 2];
-
-  let signal = null;
-  let confidence = 0;
-  let reasons = [];
-
-  if (lastRSI < 35 && nearSupport && macdRising) {
-    signal = "BUY";
-    confidence = 75;
-    reasons = ["RSI oversold", "Near support", "MACD rising"];
-    if (goldenCross) { confidence = 90; reasons.push("EMA golden cross"); }
-    if (volSpike) { confidence = Math.min(confidence + 5, 95); reasons.push("Volume spike"); }
-  } else if (lastRSI > 65 && nearResistance && !macdRising) {
-    signal = "SELL";
-    confidence = 75;
-    reasons = ["RSI overbought", "Near resistance", "MACD falling"];
-    if (deathCross) { confidence = 90; reasons.push("EMA death cross"); }
-    if (volSpike) { confidence = Math.min(confidence + 5, 95); reasons.push("Volume spike"); }
-  } else if (lastRSI < 40 && emaCross && macdRising) {
-    signal = "BUY";
-    confidence = 55;
-    reasons = ["RSI low", "EMA bullish", "MACD rising"];
-  } else if (lastRSI > 60 && !emaCross && !macdRising) {
-    signal = "SELL";
-    confidence = 55;
-    reasons = ["RSI high", "EMA bearish", "MACD falling"];
-  }
-
-  if (!signal) return null;
-
-  return {
-    signal,
-    confidence,
-    reasons,
-    rsi: lastRSI,
-    price: lastClose,
-  };
-}
-
-function computeRSI(arr, n = 14) {
-  const ch = arr.map((v, i) => (i === 0 ? 0 : v - arr[i - 1]));
-  return arr.map((_, i) => {
-    if (i < n) return null;
-    const sl = ch.slice(i - n + 1, i + 1);
-    const g = sl.filter((x) => x > 0).reduce((a, b) => a + b, 0) / n;
-    const l = sl.filter((x) => x < 0).reduce((a, b) => a + Math.abs(b), 0) / n;
-    if (l === 0) return 100;
-    return +(100 - 100 / (1 + g / l)).toFixed(2);
-  });
-}
-
-function computeEMA(arr, n) {
-  const k = 2 / (n + 1);
-  const ema = [];
-  arr.forEach((price, i) => {
-    if (i === 0) ema[i] = price;
-    else ema[i] = price * k + ema[i - 1] * (1 - k);
-  });
-  return ema;
-}
-
-function computeMACD(arr, fast = 12, slow = 26, signal = 9) {
-  const emaFast = computeEMA(arr, fast);
-  const emaSlow = computeEMA(arr, slow);
-  const macd = emaFast.map((v, i) => v - emaSlow[i]);
-  const signalLine = computeEMA(macd, signal);
-  const hist = macd.map((v, i) => v - signalLine[i]);
-  return { macd, signal: signalLine, hist };
-}
-
 // ─── Main Component ─────────────────────────────────────────────
-export default function LiveChart({ onAiAlert }) {
+export default function LiveChart() {
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
   const candleSeriesRef = useRef(null);
   const volumeSeriesRef = useRef(null);
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
-  const pingIntervalRef = useRef(null);
-  const pongTimeoutRef = useRef(null);
   const candlesRef = useRef([]);
   const volumesRef = useRef([]);
-  const lastSignalRef = useRef(null);
+  const markersRef = useRef([]);
   const signalCooldownRef = useRef(0);
+  const signalDedupeRef = useRef({});
   const reconnectAttemptsRef = useRef(0);
   const isIntentionalCloseRef = useRef(false);
   const pairSwitchDebounceRef = useRef(null);
@@ -191,6 +63,9 @@ export default function LiveChart({ onAiAlert }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [minConfidence, setMinConfidence] = useState(60);
+  // Bumping this forces the socket effect to tear down and reconnect — used by
+  // the Reconnect button. (A no-op setState can't restart an effect.)
+  const [wsNonce, setWsNonce] = useState(0);
 
   // ─── Notifications ──────────────────────────────────────────
   const enableNotifications = async () => {
@@ -219,14 +94,24 @@ export default function LiveChart({ onAiAlert }) {
     }
   }, [notificationsEnabled]);
 
+  // Keep live values reachable from the socket handlers without putting them
+  // in the socket effect's deps — otherwise every slider tick would drop the
+  // WebSocket and every parent re-render would too.
+  const minConfidenceRef = useRef(minConfidence);
+  const sendNotificationRef = useRef(sendNotification);
+  useEffect(() => {
+    minConfidenceRef.current = minConfidence;
+    sendNotificationRef.current = sendNotification;
+  }, [minConfidence, sendNotification]);
+
   // ─── Fetch History ────────────────────────────────────────
   const fetchHistory = useCallback(async (symbol, interval) => {
     setLoading(true);
     setError("");
     setReconnectStatus("");
     setAiSignal(null);
-    lastSignalRef.current = null;
     signalCooldownRef.current = 0;
+    signalDedupeRef.current = {};
 
     try {
       const res = await fetch(
@@ -256,14 +141,20 @@ export default function LiveChart({ onAiAlert }) {
 
       if (candleSeriesRef.current) {
         candleSeriesRef.current.setData(candles);
-        candleSeriesRef.current.setMarkers([]); // clear old markers
+        // Re-seed markers from the persisted signal log so history keeps its
+        // arrows across refreshes (times are snapped into the loaded range).
+        markersRef.current = markersForRange(loadSignals(), symbol, interval, candles);
+        candleSeriesRef.current.setMarkers(markersRef.current);
       }
       if (volumeSeriesRef.current) {
         volumeSeriesRef.current.setData(volData);
       }
 
+      // Catch up any open signals this window can settle.
+      resolveSignals(symbol, interval, candles, candles[candles.length - 1]?.close);
+
       const signal = analyzeSignal(candles, volumes);
-      if (signal && signal.confidence >= minConfidence) {
+      if (signal && signal.confidence >= minConfidenceRef.current) {
         setAiSignal(signal);
       }
 
@@ -280,7 +171,7 @@ export default function LiveChart({ onAiAlert }) {
       }
     }
     setLoading(false);
-  }, [minConfidence]);
+  }, []);
 
   // ─── Initialize Chart ─────────────────────────────────────
   useEffect(() => {
@@ -355,6 +246,8 @@ export default function LiveChart({ onAiAlert }) {
   }, [selectedPair, selectedInterval, fetchHistory]);
 
   // ─── WebSocket with Heartbeat & Exponential Backoff ───────
+  // Deps are deliberately limited to what must rebuild the socket. Live
+  // values (minConfidence, notification callback) are read via refs.
   useEffect(() => {
     let ws = null;
     let pingTimer = null;
@@ -454,47 +347,52 @@ export default function LiveChart({ onAiAlert }) {
         setLastPrice(candle.close);
         setPriceChange(((candle.close - candle.open) / candle.open) * 100);
 
+        // Settle any open signals this tick can resolve (±1% / candle expiry).
+        resolveSignals(selectedPair, selectedInterval, candlesRef.current, candle.close);
+
         // AI Signal check
         signalCooldownRef.current += 1;
         if (signalCooldownRef.current >= SIGNAL_COOLDOWN_TICKS && candlesRef.current.length >= 30) {
           signalCooldownRef.current = 0;
           const signal = analyzeSignal(candlesRef.current, volumesRef.current);
-          if (signal && signal.confidence >= minConfidence) {
-            const signalKey = `${selectedPair}-${signal.signal}`;
-            if (lastSignalRef.current !== signalKey) {
-              lastSignalRef.current = signalKey;
+          if (signal && signal.confidence >= minConfidenceRef.current) {
+            const key = `${selectedPair}-${selectedInterval}-${signal.signal}`;
+            const lastAt = signalDedupeRef.current[key] || 0;
+
+            if (Date.now() - lastAt >= SIGNAL_DEDUPE_MS) {
+              signalDedupeRef.current[key] = Date.now();
               setAiSignal(signal);
 
-              const alertData = {
+              addSignal({
+                id: `${selectedPair}-${selectedInterval}-${Date.now()}-${Math.random()
+                  .toString(36)
+                  .slice(2, 7)}`,
                 pair: selectedPair,
+                interval: selectedInterval,
                 signal: signal.signal,
                 confidence: signal.confidence,
                 price: signal.price,
                 time: new Date().toLocaleTimeString(),
+                timestamp: Date.now(),
                 reasons: signal.reasons,
-              };
+                status: "open",
+              });
 
-              if (onAiAlert) {
-                onAiAlert(alertData);
+              // Rebuild markers from the log — single source of truth.
+              markersRef.current = markersForRange(
+                loadSignals(),
+                selectedPair,
+                selectedInterval,
+                candlesRef.current
+              );
+              if (candleSeriesRef.current) {
+                candleSeriesRef.current.setMarkers(markersRef.current);
               }
 
-              sendNotification(
+              sendNotificationRef.current(
                 `${signal.signal} Signal: ${selectedPair}`,
                 `${signal.confidence}% confidence at $${formatPrice(signal.price)} — ${signal.reasons.join(", ")}`
               );
-
-              if (candleSeriesRef.current) {
-                candleSeriesRef.current.setMarkers([
-                  {
-                    time: candle.time,
-                    position: signal.signal === "BUY" ? "belowBar" : "aboveBar",
-                    color: signal.signal === "BUY" ? "#00d4aa" : "#ff4d6a",
-                    shape: signal.signal === "BUY" ? "arrowUp" : "arrowDown",
-                    text: `${signal.signal} ${signal.confidence}%`,
-                    size: 2,
-                  },
-                ]);
-              }
             }
           }
         }
@@ -549,7 +447,7 @@ export default function LiveChart({ onAiAlert }) {
       window.removeEventListener("online", handleOnline);
       cleanup();
     };
-  }, [selectedPair, selectedInterval, minConfidence, onAiAlert, sendNotification]);
+  }, [selectedPair, selectedInterval, wsNonce]);
 
   // ─── Debounced pair switch ────────────────────────────────
   const handlePairChange = (symbol) => {
@@ -571,15 +469,12 @@ export default function LiveChart({ onAiAlert }) {
   };
 
   // ─── Manual reconnect ───────────────────────────────────
+  // Bumping wsNonce re-runs the socket effect, whose cleanup closes the old
+  // socket. (The previous `setSelectedPair(p => p)` was a no-op, so the button
+  // closed the socket and never reopened it.)
   const manualReconnect = () => {
     reconnectAttemptsRef.current = 0;
-    isIntentionalCloseRef.current = true;
-    if (wsRef.current) {
-      try { wsRef.current.close(); } catch { /* ignore */ }
-    }
-    setTimeout(() => {
-      setSelectedPair((p) => p); // trigger reconnect via useEffect
-    }, 100);
+    setWsNonce((n) => n + 1);
   };
 
   const priceIcon =
@@ -599,6 +494,7 @@ export default function LiveChart({ onAiAlert }) {
           value={selectedPair}
           onChange={(e) => handlePairChange(e.target.value)}
           className="text-sm"
+          aria-label="Select pair"
         >
           {PAIRS.map((p) => (
             <option key={p.symbol} value={p.symbol}>
@@ -657,6 +553,7 @@ export default function LiveChart({ onAiAlert }) {
               : "bg-bg-card border-bg-border text-slate-400 hover:text-slate-200"
           }`}
           title={notificationsEnabled ? "Notifications ON" : "Enable notifications"}
+          aria-label={notificationsEnabled ? "Disable notifications" : "Enable notifications"}
         >
           {notificationsEnabled ? <Bell size={12} /> : <BellOff size={12} />}
         </button>
@@ -664,6 +561,8 @@ export default function LiveChart({ onAiAlert }) {
         <button
           onClick={() => setShowSettings(!showSettings)}
           className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs bg-bg-card border border-bg-border text-slate-400 hover:text-white transition-colors"
+          aria-label="Signal settings"
+          aria-expanded={showSettings}
         >
           <Settings size={12} />
         </button>
@@ -683,10 +582,13 @@ export default function LiveChart({ onAiAlert }) {
           <p className="text-xs text-slate-300 uppercase tracking-widest font-medium mb-3">AI Signal Settings</p>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <div>
-              <label className="block text-xs text-slate-300 mb-1">Min Confidence: {minConfidence}%</label>
+              <label htmlFor="min-confidence" className="block text-xs text-slate-300 mb-1">
+                Min Confidence: {minConfidence}%
+              </label>
               <input
+                id="min-confidence"
                 type="range"
-                min="50"
+                min="40"
                 max="95"
                 step="5"
                 value={minConfidence}
@@ -695,8 +597,10 @@ export default function LiveChart({ onAiAlert }) {
               />
             </div>
             <div className="text-xs text-slate-300">
-              <p>Signals: RSI, EMA cross, MACD, Volume, Support/Resistance</p>
-              <p className="mt-1">Higher confidence = fewer but stronger signals</p>
+              <p>Scored from RSI, support/resistance, MACD, EMA cross, structure & volume.</p>
+              <p className="mt-1">
+                Confidence = total points (max 95). One signal per pair+direction every 30min.
+              </p>
             </div>
           </div>
         </div>
@@ -773,7 +677,9 @@ export default function LiveChart({ onAiAlert }) {
       />
 
       <p className="mt-3 text-xs text-slate-300">
-        Data via Binance WebSocket. AI signals use RSI, EMA, MACD, Volume & Support/Resistance analysis. Not financial advice.
+        Data via Binance WebSocket. Signals are a rule-based confluence of RSI, EMA, MACD,
+        structure, volume & support/resistance — logged with a ±1% target so the hit rate is
+        measurable. Not financial advice.
       </p>
     </div>
   );
